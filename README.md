@@ -1,6 +1,6 @@
 # Reviewer AI
 
-Kanıta dayalı commit incelemesi yapan küçük bir web uygulaması. Yerelde oturum açmış Codex CLI’ı kullanır; API anahtarı veya API kredisi gerektirmez. Diff, commit metadatası, ilgili README ve isteğe bağlı inceleme notu Codex’e iletilir; sonuç yalnızca önceden tanımlı JSON şemasında kabul edilir.
+Commit incelemesi yapan küçük bir web uygulaması. Yerelde oturum açmış Codex CLI’ı kullanır; API anahtarı veya API kredisi gerektirmez. Diff, commit metadatası, ilgili README ve isteğe bağlı inceleme notu Codex’e iletilir; sonuç yalnızca önceden tanımlı JSON şemasında kabul edilir.
 
 ## Çalıştırma
 
