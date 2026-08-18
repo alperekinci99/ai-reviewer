@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Reviewer — Kanıta Dayalı Commit İncelemesi</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="workspace">
+        <form id="review-form">
+          <div class="form-top"><div><a class="brand" href="/">reviewer<span>·</span>ai</a><h2>Commit incelemesi</h2></div><div class="header-status"><span id="repository" class="privacy">Diff’i manuel ekleyin</span><span id="codex-status" class="privacy"><i></i> Codex CLI kontrol ediliyor</span></div></div>
+          <div id="context-error" class="context-error" hidden></div>
+          <div class="settings-row"><label>Model<select name="model"><option value="gpt-5.6-terra" selected>GPT-5.6 Terra — dengeli</option><option value="gpt-5.6-luna">GPT-5.6 Luna — düşük tüketim</option><option value="gpt-5.6-sol">GPT-5.6 Sol — kapsamlı inceleme</option><option value="gpt-5.5">GPT-5.5 — kapsamlı</option><option value="gpt-5.4">GPT-5.4 — dengeli</option><option value="gpt-5.4-mini">GPT-5.4 mini — ekonomik</option></select><small>Model erişimi Codex hesabınıza bağlıdır.</small></label><label class="effort-setting">Çaba<select name="reasoningEffort"><option value="none">Yok</option><option value="low">Düşük</option><option value="medium" selected>Orta</option><option value="high">Yüksek</option><option value="xhigh">Çok yüksek</option><option value="max">Maksimum — yalnızca GPT-5.6</option></select></label></div>
+          <input type="hidden" name="commit" />
+          <section id="commit-overview" class="commit-overview" hidden>
+            <div class="commit-overview-head"><span>Commit</span><h3 id="commit-subject"></h3></div>
+            <dl class="commit-details"><div><dt>Commit</dt><dd><code id="commit-hash"></code></dd></div><div><dt>Yazar</dt><dd id="commit-author"></dd></div><div><dt>Tarih</dt><dd id="commit-date"></dd></div></dl>
+          </section>
+          <textarea id="diff-input" name="diff" hidden></textarea>
+          <section class="diff-preview-wrap"><div class="diff-preview-head"><span>Diff</span><span>+ ekleme · − silme</span></div><pre id="diff-preview" class="diff-preview"><code>Repository bağlamı yüklendiğinde diff burada görünür.</code></pre></section>
+          <input type="hidden" name="agents" />
+          <textarea name="readme" hidden></textarea>
+          <div class="extra"><label>İnceleme notu<textarea name="note" rows="3" placeholder="Özellikle kontrol edilmesini istediğiniz konu..."></textarea></label></div>
+          <div class="actions"><span id="status" aria-live="polite"></span><button type="submit">İncelemeyi başlat <span>→</span></button></div>
+        </form>
+        <section id="result" class="result empty" aria-live="polite"><div class="result-empty"><div class="orb"><span>⌁</span></div><h3>Sonuç burada görünecek</h3></div></section>
+      </section>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "name": "ai-reviewer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Evidence-focused AI commit review workspace",
+  "scripts": {
+    "dev": "node server.mjs",
+    "start": "node server.mjs",
+    "review": "node review.mjs",
+    "codex:status": "codex login status"
+  },
+  "engines": { "node": ">=18" }
+}
