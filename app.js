@@ -19,7 +19,11 @@ function render(data) {
   result.innerHTML = `<header class="review-summary"><div><span class="verdict-dot"></span><span>${verdict === 'approve' ? 'Onaylanabilir' : 'Değişiklik gerekli'}</span><h2>${escape(data.summary?.one_line || '')}</h2></div><span class="count">${findings.length} bulgu</span></header>${cards}`;
 }
 
-function renderCommit(commit) {
+function renderCommit(commit, reviewType) {
+  const isPullRequest = reviewType === 'pull_request';
+  document.querySelector('#review-title').textContent = isPullRequest ? 'Pull request incelemesi' : 'Commit incelemesi';
+  document.querySelector('#change-kind').textContent = isPullRequest ? 'Pull request' : 'Commit';
+  document.querySelector('#change-hash-label').textContent = isPullRequest ? 'Merge commit' : 'Commit';
   form.elements.commit.value = commit.context;
   document.querySelector('#commit-subject').textContent = commit.subject;
   document.querySelector('#commit-hash').textContent = commit.hash;
@@ -66,7 +70,7 @@ async function loadRepositoryContext() {
     const data = await response.json();
     if (!response.ok) { const error = new Error(data.error); error.repository = data.repository; throw error; }
     if (!data.enabled) return;
-    renderCommit(data.commit);
+    renderCommit(data.commit, data.reviewType);
     form.elements.diff.value = data.diff;
     renderDiff();
     form.elements.readme.value = data.readme;

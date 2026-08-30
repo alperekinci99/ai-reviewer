@@ -1,6 +1,6 @@
 # Reviewer AI
 
-Commit incelemesi yapan küçük bir web uygulaması. Yerelde oturum açmış Codex CLI’ı kullanır; API anahtarı veya API kredisi gerektirmez. Diff, commit metadatası, ilgili README ve isteğe bağlı inceleme notu Codex’e iletilir; sonuç yalnızca önceden tanımlı JSON şemasında kabul edilir.
+Commit veya pull request incelemesi yapan küçük bir web uygulaması. Yerelde oturum açmış Codex CLI’ı kullanır; API anahtarı veya API kredisi gerektirmez. Diff, değişiklik metadatası, ilgili README ve isteğe bağlı inceleme notu Codex’e iletilir; sonuç yalnızca önceden tanımlı JSON şemasında kabul edilir.
 
 ## Çalıştırma
 
@@ -22,13 +22,17 @@ Codex Desktop’ın varsayılan macOS yolu otomatik algılanır. Farklı bir Cod
 
 ## Repository seçimi
 
-`npm run review` sırasıyla repository yolunu ve commit kimliğini sorar. Commit alanını boş bırakırsanız `HEAD` kullanılır. Uygulama Git ile commit bilgisini, diff’i, değişen dosyalara en yakın `README.md` belgelerini ve her değişen dosya için uygulanabilir `AGENTS.md` belgelerini otomatik yükler.
+`npm run review` sırasıyla repository yolunu, inceleme türünü ve hedefi sorar. `commit` seçildiğinde commit kimliği boş bırakılırsa `HEAD` kullanılır. `pr` seçildiğinde GitHub veya Azure DevOps pull request URL’sini ya da yalnızca PR numarasını girin.
+
+PR incelemesinde uygulama, `origin` uzak bağlantısından PR’ın merge ref’ini alır ve hedef dal ile kaynak dal arasındaki toplam diff’i inceler. Böylece PR içindeki tüm commit’ler tek inceleme kapsamına girer. Uzak repository’ye erişiminiz ve PR merge ref’inin erişilebilir olması gerekir.
+
+Uygulama Git ile değişiklik bilgisini, diff’i, değişen dosyalara en yakın `README.md` belgelerini ve her değişen dosya için uygulanabilir `AGENTS.md` belgelerini otomatik yükler.
 
 ```bash
 npm run review
 ```
 
-Hedef yol, Reviewer uygulamasının bulunduğu klasör değil, incelenecek projenin Git repository kökü (veya içindeki bir klasör) olmalıdır. Uygulama başlığında yüklü repository ve kısa commit kimliği görünür.
+Hedef yol, Reviewer uygulamasının bulunduğu klasör değil, incelenecek projenin Git repository kökü (veya içindeki bir klasör) olmalıdır. Uygulama başlığında yüklü repository ve kısa değişiklik kimliği görünür.
 
 ## Güvenlik
 
