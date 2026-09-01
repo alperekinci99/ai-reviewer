@@ -1,11 +1,16 @@
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline/promises';
+import { loadProjects } from './project-config.mjs';
 
 const terminal = createInterface({ input: process.stdin, output: process.stdout });
 const clean = value => value.trim().replace(/^['"]|['"]$/g, '');
 
 try {
-  const repo = clean(await terminal.question('Repository yolu: '));
+  const projects = await loadProjects();
+  const aliases = Object.keys(projects);
+  if (aliases.length) console.log(`Kayıtlı projeler: ${aliases.join(', ')}`);
+  const selection = clean(await terminal.question('Repository yolu veya proje kısayolu: '));
+  const repo = projects[selection.toLowerCase()] || selection;
   if (!repo) throw new Error('Repository yolu boş bırakılamaz.');
   const type = clean(await terminal.question('İnceleme türü (commit/pr) [commit]: ')).toLowerCase() || 'commit';
   if (!['commit', 'pr'].includes(type)) throw new Error('İnceleme türü commit veya pr olmalıdır.');

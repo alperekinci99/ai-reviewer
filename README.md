@@ -22,7 +22,13 @@ Codex Desktop’ın varsayılan macOS yolu otomatik algılanır. Farklı bir Cod
 
 ## Repository seçimi
 
-`npm run review` sırasıyla repository yolunu, inceleme türünü ve hedefi sorar. `commit` seçildiğinde commit kimliği boş bırakılırsa `HEAD` kullanılır. `pr` seçildiğinde GitHub veya Azure DevOps pull request URL’sini ya da yalnızca PR numarasını girin.
+`npm run review` sırasıyla repository yolunu (veya kayıtlı proje kısayolunu), inceleme türünü ve hedefi sorar. `commit` seçildiğinde commit kimliği boş bırakılırsa `HEAD` kullanılır. `pr` seçildiğinde GitHub veya Azure DevOps pull request URL’sini ya da yalnızca PR numarasını girin.
+
+### Kayıtlı projeler
+
+Repository yollarını kullanıcı bazında kaydetmek için bir kez `npm run projects` çalıştırın. Komut, proje kısayolu ve repository yolunu ister; sonrasında `npm run review` içinde yalnızca kısayolu (örneğin `webservice`) yazmanız yeterlidir. Tam yol girme davranışı değişmeden kalır.
+
+Kayıtlar ortak repository’ye eklenmez: varsayılan olarak kullanıcının `~/.config/ai-reviewer/projects.json` dosyasında tutulur. Başka bir konum kullanmak için `AI_REVIEWER_PROJECTS_FILE`, klasör seçmek için `AI_REVIEWER_CONFIG_DIR` ortam değişkenini tanımlayabilirsiniz. Böylece her kullanıcı kendi yollarını yönetir; paylaşılan kodda kişisel klasör yolları bulunmaz.
 
 PR incelemesinde uygulama, `origin` uzak bağlantısından PR’ın merge ref’ini alır ve hedef dal ile kaynak dal arasındaki toplam diff’i inceler. Böylece PR içindeki tüm commit’ler tek inceleme kapsamına girer. Uzak repository’ye erişiminiz ve PR merge ref’inin erişilebilir olması gerekir.
 
