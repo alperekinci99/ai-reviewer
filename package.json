@@ -8,7 +8,8 @@
     "start": "node server.mjs",
     "review": "node review.mjs",
     "projects": "node projects.mjs",
-    "codex:status": "codex login status"
+    "codex:status": "codex login status",
+    "test": "node --test"
   },
   "engines": { "node": ">=18" }
 }

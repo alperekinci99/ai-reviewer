@@ -30,7 +30,7 @@ Repository yollarını kullanıcı bazında kaydetmek için bir kez `npm run pro
 
 Kayıtlar ortak repository’ye eklenmez: varsayılan olarak kullanıcının `~/.config/ai-reviewer/projects.json` dosyasında tutulur. Başka bir konum kullanmak için `AI_REVIEWER_PROJECTS_FILE`, klasör seçmek için `AI_REVIEWER_CONFIG_DIR` ortam değişkenini tanımlayabilirsiniz. Böylece her kullanıcı kendi yollarını yönetir; paylaşılan kodda kişisel klasör yolları bulunmaz.
 
-PR incelemesinde uygulama, `origin` uzak bağlantısından PR’ın merge ref’ini alır ve hedef dal ile kaynak dal arasındaki toplam diff’i inceler. Böylece PR içindeki tüm commit’ler tek inceleme kapsamına girer. Uzak repository’ye erişiminiz ve PR merge ref’inin erişilebilir olması gerekir.
+PR incelemesinde uygulama, `origin` uzak bağlantısından PR’ın merge ref’ini alır ve hedef dal ile kaynak dal arasındaki toplam diff’i inceler. Böylece PR içindeki tüm commit’ler tek inceleme kapsamına girer. Uzak repository’ye erişiminiz ve PR merge ref’inin erişilebilir olması gerekir. Bulgular yalnızca diff’te eklenen satırlara bağlanabilir; değişmeyen dosya ve satırlara ilişkin yorumlar sonuçtan elenir. README ile `AGENTS.md` dosyaları yalnızca bu değişikliklerin etkisini değerlendirmek için bağlam sağlar.
 
 Uygulama Git ile değişiklik bilgisini, diff’i, değişen dosyalara en yakın `README.md` belgelerini ve her değişen dosya için uygulanabilir `AGENTS.md` belgelerini otomatik yükler.
 
