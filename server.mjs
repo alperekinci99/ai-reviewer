@@ -6,6 +6,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { tmpdir } from 'node:os';
 import { limitReviewToChangedCode } from './review-scope.mjs';
+import { azurePullRequestUrl } from './pr-url.mjs';
 
 const root = new URL('.', import.meta.url).pathname;
 const port = Number(process.env.PORT || 3000);
@@ -36,6 +37,24 @@ function send(res, status, body, type = 'application/json; charset=utf-8') {
 }
 
 async function git(args) { return (await run('git', ['-C', repoPath, ...args], { maxBuffer: 8_000_000 })).stdout; }
+
+async function azurePullRequestRefs(url) {
+  const azure = azurePullRequestUrl(url);
+  if (!azure) return null;
+  try {
+    const { stdout } = await run('az', [
+      'repos', 'pr', 'show', '--id', azure.id, '--repository', azure.repository,
+      '--organization', `https://dev.azure.com/${azure.organization}/${azure.project}`,
+      '--output', 'json'
+    ], { cwd: repoPath, maxBuffer: 1_000_000 });
+    const pullRequest = JSON.parse(stdout);
+    if (!pullRequest.sourceRefName || !pullRequest.targetRefName) throw new Error('PR kaynak veya hedef ref bilgisi dönmedi.');
+    return { ...azure, source: pullRequest.sourceRefName, target: pullRequest.targetRefName, title: pullRequest.title || '' };
+  } catch (error) {
+    const detail = error.stderr?.trim() || error.message;
+    throw new Error(`Azure DevOps PR bilgisi okunamadı. Azure CLI ile oturum açtığınızdan ve Azure DevOps eklentisinin kurulu olduğundan emin olun. ${detail}`);
+  }
+}
 
 async function nearestReadmes(files) {
   const found = new Set();
@@ -79,19 +98,35 @@ async function pullRequestContext() {
   try {
     await git(['fetch', '--no-tags', 'origin', `refs/pull/${id}/merge`]);
   } catch (error) {
-    throw new Error(`PR #${id} yerel repository’den alınamadı. GitHub veya Azure DevOps uzak bağlantısında bu PR’ın merge ref’i erişilebilir olmalıdır. ${error.stderr?.trim() || error.message}`);
+    const azureRefs = await azurePullRequestRefs(selectedPullRequest);
+    if (!azureRefs) {
+      throw new Error(`PR #${id} yerel repository’den alınamadı. GitHub uzak bağlantısında bu PR’ın merge ref’i erişilebilir olmalıdır. ${error.stderr?.trim() || error.message}`);
+    }
+    try {
+      await git(['fetch', '--no-tags', 'origin', azureRefs.target]);
+      const base = (await git(['rev-parse', 'FETCH_HEAD'])).trim();
+      await git(['fetch', '--no-tags', 'origin', azureRefs.source]);
+      const head = (await git(['rev-parse', 'FETCH_HEAD'])).trim();
+      return pullRequestDiffContext({ id, base, head, subject: azureRefs.title, comparison: `${azureRefs.target}...${azureRefs.source}` });
+    } catch (fetchError) {
+      throw new Error(`Azure DevOps PR #${id} için kaynak/hedef dallar alınamadı. ${fetchError.stderr?.trim() || fetchError.message}`);
+    }
   }
   const parents = (await git(['show', '--no-patch', '--format=%P', 'FETCH_HEAD'])).trim().split(' ').filter(Boolean);
   if (parents.length < 2) throw new Error(`PR #${id} için merge ref’i iki ebeveynli bir merge commit döndürmedi; doğru repository ve PR numarasını kontrol edin.`);
   const [base, head] = parents;
+  return pullRequestDiffContext({ id, base, head, comparison: `${base}...${head}`, mergeRef: 'FETCH_HEAD' });
+}
+
+async function pullRequestDiffContext({ id, base, head, subject = '', comparison, mergeRef }) {
   const [name, commitRaw, diff, files] = await Promise.all([
     git(['rev-parse', '--show-toplevel']),
-    git(['show', '--no-patch', '--format=%H%x00%an%x00%aI%x00%s', 'FETCH_HEAD']),
+    git(['show', '--no-patch', '--format=%H%x00%an%x00%aI%x00%s', mergeRef || head]),
     git(['diff', '--no-ext-diff', '--no-renames', base, head]),
     git(['diff', '--name-only', base, head])
   ]);
-  const [hash, author, authoredAt, subject] = commitRaw.trim().split('\0');
-  const commit = { hash, author, authoredAt, subject, context: `Pull request: #${id}\nMerge commit: ${hash}\nYazar: ${author}\nTarih: ${authoredAt}\nBaşlık: ${subject}\nKarşılaştırma: ${base}...${head}` };
+  const [hash, author, authoredAt, mergeSubject] = commitRaw.trim().split('\0');
+  const commit = { hash, author, authoredAt, subject: subject || mergeSubject, context: `Pull request: #${id}\nReferans commit: ${hash}\nYazar: ${author}\nTarih: ${authoredAt}\nBaşlık: ${subject || mergeSubject}\nKarşılaştırma: ${comparison}` };
   const changedFiles = files.trim().split('\n').filter(Boolean);
   return { enabled: true, reviewType: 'pull_request', repository: name.trim().split('/').pop(), commit, diff: diff.trim(), readme: await nearestReadmes(changedFiles), agents: await relevantAgents(changedFiles) };
 }
