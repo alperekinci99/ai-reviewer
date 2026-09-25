@@ -3,31 +3,132 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Reviewer — Kod İncelemesi</title>
+    <meta name="description" content="Projeler, kod incelemeleri, görevler ve çalışma hafızası için yerel developer cockpit." />
+    <meta name="theme-color" content="#0b0d10" />
+    <title>Orbit — Developer Cockpit</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230b0d10'/%3E%3Cpath d='M18 32a14 14 0 1 0 28 0 14 14 0 1 0-28 0' fill='none' stroke='%23b7f36b' stroke-width='5'/%3E%3Ccircle cx='46' cy='20' r='6' fill='%23fff'/%3E%3C/svg%3E" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <main class="shell">
-      <section class="workspace">
-        <form id="review-form">
-          <div class="form-top"><div><a class="brand" href="/">reviewer<span>·</span>ai</a><h2 id="review-title">Kod incelemesi</h2></div><div class="header-status"><span id="repository" class="privacy">Diff’i manuel ekleyin</span><span id="codex-status" class="privacy"><i></i> Codex CLI kontrol ediliyor</span></div></div>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Ana navigasyon">
+        <a class="brand" href="#dashboard" aria-label="Orbit ana sayfa"><span class="brand-mark">O</span><span>orbit</span></a>
+        <nav class="main-nav">
+          <button class="nav-item active" data-view="dashboard" type="button"><span class="nav-icon">⌂</span><span>Genel bakış</span></button>
+          <button class="nav-item" data-view="review" type="button"><span class="nav-icon">↳</span><span>AI Review</span><span class="nav-badge">AI</span></button>
+          <button class="nav-item" data-view="workflow" type="button"><span class="nav-icon">◇</span><span>Workflow</span></button>
+          <button class="nav-item" data-view="journal" type="button"><span class="nav-icon">□</span><span>Dev Journal</span></button>
+        </nav>
+        <div class="sidebar-bottom">
+          <div class="local-state"><i></i><span>Local workspace</span></div>
+          <button class="profile" type="button" aria-label="Profil"><span class="avatar">AE</span><span><b>Developer</b><small>kişisel alan</small></span><span class="profile-more">···</span></button>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <button id="mobile-menu" class="icon-button mobile-menu" type="button" aria-label="Menüyü aç">☰</button>
+          <div class="top-actions">
+            <button class="command-trigger" type="button" aria-label="Komut paletini aç"><span>⌕</span><span>Hızlı ara</span><kbd>⌘ K</kbd></button>
+            <span id="codex-status" class="connection"><i></i>Codex kontrol ediliyor</span>
+          </div>
+        </header>
+
+        <section id="view-dashboard" class="view active" data-view-panel="dashboard">
+          <div class="page-heading dashboard-heading">
+            <div><p class="eyebrow" id="today-label">BUGÜN</p><h1>İyi çalışmalar, Alper.</h1><p>Projendeki son durum ve sıradaki odak alanların.</p></div>
+            <button class="primary-button" data-open-task type="button"><span>＋</span> Yeni görev</button>
+          </div>
+
+          <div class="dashboard-grid">
+            <section class="focus-card dark-card">
+              <div class="card-label"><span class="pulse"></span>ŞİMDİKİ ODAK</div>
+              <div class="focus-content"><p id="focus-kicker">DEVELOPER PORTAL · YAPILIYOR</p><h2 id="focus-title">Developer portal iskeletini tamamla</h2><div class="focus-meta"><span id="focus-complexity">5 puan</span><span id="focus-priority">Yüksek öncelik</span></div></div>
+              <div class="focus-actions"><button id="complete-focus" type="button">Tamamlandı olarak işaretle</button><button class="round-button" data-view-target="workflow" type="button" aria-label="Workflow'a git">↗</button></div>
+            </section>
+
+            <section class="metric-card"><div class="metric-top"><span class="metric-icon green">↳</span><span>SON 7 GÜN</span></div><strong id="review-count">0</strong><p>kod incelemesi</p><div class="mini-bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></section>
+            <section class="metric-card"><div class="metric-top"><span class="metric-icon amber">◇</span><span>AKTİF</span></div><strong id="task-count">3</strong><p>açık görev</p><div class="completion"><span><i id="completion-bar"></i></span><small id="completion-label">%25 tamamlandı</small></div></section>
+
+            <section class="activity-card">
+              <div class="section-head"><div><span class="section-kicker">AKIŞ</span><h2>Son aktiviteler</h2></div><button class="text-button" data-view-target="journal" type="button">Tümünü gör <span>→</span></button></div>
+              <div id="activity-list" class="activity-list"></div>
+            </section>
+
+          </div>
+        </section>
+
+        <section id="view-review" class="view" data-view-panel="review">
+          <div class="page-heading"><div><p class="eyebrow">QUALITY GATE</p><h1>AI Code Review</h1><p>Commit veya pull request değişikliklerini kanıta dayalı olarak incele.</p></div><div class="review-project-context"><span id="repository" class="repo-pill">Proje seçilmedi</span><button id="review-project-switcher" class="secondary-button" type="button"><span>＋</span> Proje seç</button></div></div>
           <div id="context-error" class="context-error" hidden></div>
-          <div class="settings-row"><label>Model<select name="model"><option value="gpt-5.6-terra" selected>GPT-5.6 Terra — dengeli</option><option value="gpt-5.6-luna">GPT-5.6 Luna — düşük tüketim</option><option value="gpt-5.6-sol">GPT-5.6 Sol — kapsamlı inceleme</option><option value="gpt-5.5">GPT-5.5 — kapsamlı</option><option value="gpt-5.4">GPT-5.4 — dengeli</option><option value="gpt-5.4-mini">GPT-5.4 mini — ekonomik</option></select><small>Model erişimi Codex hesabınıza bağlıdır.</small></label><label class="effort-setting">Çaba<select name="reasoningEffort"><option value="none">Yok</option><option value="low">Düşük</option><option value="medium" selected>Orta</option><option value="high">Yüksek</option><option value="xhigh">Çok yüksek</option><option value="max">Maksimum — yalnızca GPT-5.6</option></select></label></div>
-          <input type="hidden" name="commit" />
-          <section id="commit-overview" class="commit-overview" hidden>
-            <div class="commit-overview-head"><span id="change-kind">Commit</span><h3 id="commit-subject"></h3></div>
-            <dl class="commit-details"><div><dt id="change-hash-label">Commit</dt><dd><code id="commit-hash"></code></dd></div><div><dt>Yazar</dt><dd id="commit-author"></dd></div><div><dt>Tarih</dt><dd id="commit-date"></dd></div></dl>
+          <form id="review-form" class="review-layout is-disabled" aria-disabled="true">
+            <section class="review-main panel">
+              <div id="commit-overview" class="commit-overview" hidden>
+                <div class="commit-overview-head"><span id="change-kind">Commit</span><h3 id="commit-subject"></h3></div>
+                <dl class="commit-details"><div><dt id="change-hash-label">Commit</dt><dd><code id="commit-hash"></code></dd></div><div><dt>Yazar</dt><dd id="commit-author"></dd></div><div><dt>Tarih</dt><dd id="commit-date"></dd></div></dl>
+              </div>
+              <textarea id="diff-input" name="diff" hidden disabled></textarea>
+              <div class="diff-preview-head"><div><span class="section-kicker">DEĞİŞİKLİKLER</span><h2>Diff önizleme</h2></div><span>+ ekleme&nbsp;&nbsp; − silme</span></div>
+              <pre id="diff-preview" class="diff-preview"><code>Repository bağlamı yüklendiğinde diff burada görünür.</code></pre>
+            </section>
+            <aside class="review-controls panel">
+              <div><span class="section-kicker">İNCELEME AYARLARI</span><h2>Review kapsamı</h2></div>
+              <label>Yerel LLM aracı<select id="provider-select" name="provider" disabled><option value="auto">Otomatik seçim</option></select><small>Kurulu aracın mevcut oturumu kullanılır; API anahtarı istenmez.</small></label>
+              <label>Model <span>(Codex)</span><select name="model" disabled><option value="gpt-5.6-terra" selected>GPT-5.6 Terra</option><option value="gpt-5.6-luna">GPT-5.6 Luna</option><option value="gpt-5.6-sol">GPT-5.6 Sol</option><option value="gpt-5.5">GPT-5.5</option><option value="gpt-5.4">GPT-5.4</option><option value="gpt-5.4-mini">GPT-5.4 mini</option></select></label>
+              <label>Çaba<select name="reasoningEffort" disabled><option value="none">Yok</option><option value="low">Düşük</option><option value="medium" selected>Orta</option><option value="high">Yüksek</option><option value="xhigh">Çok yüksek</option><option value="max">Maksimum</option></select></label>
+              <label>İnceleme notu<textarea name="note" rows="4" placeholder="Özellikle kontrol edilmesini istediğin konu..." disabled></textarea></label>
+              <input type="hidden" name="commit" disabled /><input type="hidden" name="agents" disabled /><textarea name="readme" hidden disabled></textarea>
+              <div id="status" class="form-status" aria-live="polite"></div>
+              <button class="primary-button full" type="submit" disabled>İncelemeyi başlat <span>→</span></button>
+            </aside>
+          </form>
+          <section id="result" class="result panel empty is-disabled" aria-live="polite"><div class="result-empty"><div class="empty-orbit">⌁</div><h3>Önce bir proje seç</h3><p>Review alanı repository bağlamı yüklendiğinde kullanıma açılır.</p></div></section>
+        </section>
+
+        <section id="view-workflow" class="view" data-view-panel="workflow">
+          <div class="page-heading"><div><p class="eyebrow">PROJECT FLOW</p><h1>Workflow</h1><p>Görevi Yapılıyor’a taşı; yerel agent uygulasın, Review’da sen incele.</p></div><button class="primary-button" data-open-task type="button"><span>＋</span> Yeni görev</button></div>
+          <section class="coder-panel">
+            <div class="coder-copy"><span class="section-kicker light">CODER SESSION</span><h2>Bir sonraki değişikliği birlikte planla.</h2><p>Repository bağlamını okuyarak dosya seviyesinde uygulanabilir bir plan çıkarır. Bu aşama kodu değiştirmez.</p></div>
+            <form id="coder-form"><label for="coder-project">Proje</label><div class="path-picker"><input id="coder-project" name="repository" list="project-options" required autocomplete="off" placeholder="Proje kısayolu veya repository yolu" /><button class="path-picker-button" type="button" data-pick-folder data-target="coder-project" data-feedback="coder-status">Finder’dan seç</button></div><div class="saved-project-picker"><div class="saved-project-head"><span>KAYITLI PROJELER</span><button type="button" data-save-project data-target="coder-project" data-feedback="coder-status">Mevcut yolu kaydet</button></div><div class="saved-project-list" data-project-list data-target="coder-project" data-feedback="coder-status"></div></div><label for="coder-provider-select">Yerel LLM aracı</label><select id="coder-provider-select" name="provider"><option value="auto">Otomatik seçim</option></select><label for="coder-complexity">İş puanı</label><select id="coder-complexity" name="complexity"><option value="2">2 · Küçük ve net iş</option><option value="3" selected>3 · Orta kapsamlı iş</option><option value="5">5 · Kapsamlı ve riskli iş</option></select><div id="coder-model-route" class="model-route">Otomatik model profili hazırlanıyor…</div><label for="coder-prompt">Ne yapmak istiyorsun?</label><textarea id="coder-prompt" name="prompt" rows="3" required maxlength="2000" placeholder="Örn. Tamamlanan görevi otomatik olarak journal'a ekle"></textarea><div class="coder-actions"><span id="coder-status" aria-live="polite">Salt-okunur planlama</span><button type="submit">Plan oluştur <span>→</span></button></div></form>
+            <div id="coder-result" class="coder-result" hidden></div>
           </section>
-          <textarea id="diff-input" name="diff" hidden></textarea>
-          <section class="diff-preview-wrap"><div class="diff-preview-head"><span>Diff</span><span>+ ekleme · − silme</span></div><pre id="diff-preview" class="diff-preview"><code>Repository bağlamı yüklendiğinde diff burada görünür.</code></pre></section>
-          <input type="hidden" name="agents" />
-          <textarea name="readme" hidden></textarea>
-          <div class="extra"><label>İnceleme notu<textarea name="note" rows="3" placeholder="Özellikle kontrol edilmesini istediğiniz konu..."></textarea></label></div>
-          <div class="actions"><span id="status" aria-live="polite"></span><button type="submit">İncelemeyi başlat <span>→</span></button></div>
-        </form>
-        <section id="result" class="result empty" aria-live="polite"><div class="result-empty"><div class="orb"><span>⌁</span></div><h3>Sonuç burada görünecek</h3></div></section>
-      </section>
-    </main>
+          <div id="kanban" class="kanban" aria-label="Görev panosu"></div>
+        </section>
+
+        <section id="view-journal" class="view" data-view-panel="journal">
+          <div class="page-heading"><div><p class="eyebrow">WORKING MEMORY</p><h1>Dev Journal</h1><p>Gün gün ilerleme, kararlar ve çözülmeyi bekleyen noktalar.</p></div><button id="add-journal" class="secondary-button" type="button">＋ Bugüne not ekle</button></div>
+          <div class="journal-layout">
+            <aside class="calendar-panel panel"><div class="calendar-head"><button type="button" aria-label="Önceki ay">←</button><strong id="calendar-month"></strong><button type="button" aria-label="Sonraki ay">→</button></div><div class="weekdays"><span>Pzt</span><span>Sal</span><span>Çar</span><span>Per</span><span>Cum</span><span>Cmt</span><span>Paz</span></div><div id="calendar-grid" class="calendar-grid"></div></aside>
+            <section class="journal-feed"><div class="section-head"><div><span class="section-kicker">GÜNLÜK ÖZET</span><h2 id="journal-date-title">Bugün</h2></div></div><div id="journal-entries"></div></section>
+          </div>
+        </section>
+
+      </main>
+    </div>
+
+    <datalist id="project-options"></datalist>
+
+    <dialog id="project-dialog" class="project-dialog">
+      <form id="project-form" method="dialog">
+        <div class="dialog-head"><div><span class="section-kicker">ÇALIŞMA BAĞLAMI</span><h2>Bir proje aç</h2><p>İncelenecek repository ve değişikliği seç.</p></div><button class="dialog-close" value="cancel" type="submit" formnovalidate aria-label="Kapat">×</button></div>
+        <label for="review-project-path">Repository yolu veya proje kısayolu</label><div class="path-picker"><input id="review-project-path" name="repository" list="project-options" required autocomplete="off" placeholder="/Users/.../proje veya kayıtlı kısayol" /><button class="path-picker-button" type="button" data-pick-folder data-target="review-project-path" data-feedback="project-error">Finder’dan seç</button></div><small id="project-hint" class="field-hint">Yerel Git repository kökünü seç.</small><div class="saved-project-picker"><div class="saved-project-head"><span>KAYITLI PROJELER</span><button type="button" data-save-project data-target="review-project-path" data-feedback="project-error">Mevcut yolu kaydet</button></div><div class="saved-project-list" data-project-list data-target="review-project-path" data-feedback="project-error"></div></div>
+        <div class="dialog-grid"><label>İnceleme türü<select name="reviewType"><option value="commit">Commit</option><option value="pr">Pull request</option></select></label><label><span id="target-label">Commit</span><input name="target" placeholder="HEAD" /></label></div>
+        <div id="project-error" class="dialog-error" aria-live="polite"></div>
+        <div class="dialog-actions"><button class="secondary-button" value="cancel" type="submit" formnovalidate>Vazgeç</button><button class="primary-button" value="default" type="submit">Projeyi yükle <span>→</span></button></div>
+      </form>
+    </dialog>
+
+    <dialog id="task-dialog">
+      <form id="task-form" method="dialog">
+        <div class="dialog-head"><div><span class="section-kicker">YENİ GÖREV</span><h2>Odağı tanımla</h2></div><button class="dialog-close" value="cancel" type="submit" formnovalidate aria-label="Kapat">×</button></div>
+        <label>Görev adı<input name="title" required maxlength="100" placeholder="Örn. Review sonuçlarını journal'a bağla" /></label>
+        <label for="task-project">Proje</label><div class="path-picker"><input id="task-project" name="project" list="project-options" required autocomplete="off" placeholder="Proje adı, kısayolu veya repository yolu" /><button class="path-picker-button" type="button" data-pick-folder data-target="task-project" data-feedback="task-error">Finder’dan seç</button></div><div class="saved-project-picker"><div class="saved-project-head"><span>KAYITLI PROJELER</span><button type="button" data-save-project data-target="task-project" data-feedback="task-error">Mevcut yolu kaydet</button></div><div class="saved-project-list" data-project-list data-target="task-project" data-feedback="task-error"></div></div>
+        <div class="dialog-grid task-settings-grid"><label>Durum<select name="status"><option value="todo">Yapılacak</option><option value="doing">Yapılıyor</option><option value="review">Review</option><option value="done">Tamamlandı</option></select></label><label>Öncelik<select name="priority"><option value="high">Yüksek</option><option value="medium" selected>Orta</option><option value="low">Düşük</option></select></label><label>İş puanı<select name="points"><option value="2">2 · Küçük</option><option value="3" selected>3 · Orta</option><option value="5">5 · Kapsamlı</option></select></label></div><small id="task-model-hint" class="field-hint">Coder profili: GPT-5.6 Terra · orta akıl yürütme</small>
+        <label>Not<textarea name="description" rows="3" placeholder="Kısa bağlam veya kabul kriteri"></textarea></label>
+        <div id="task-error" class="dialog-error" aria-live="polite"></div>
+        <div class="dialog-actions"><button class="secondary-button" value="cancel" type="submit" formnovalidate>Vazgeç</button><button class="primary-button" value="default" type="submit">Görevi ekle</button></div>
+      </form>
+    </dialog>
     <script src="/app.js"></script>
   </body>
 </html>

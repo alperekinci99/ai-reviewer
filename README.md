@@ -1,20 +1,46 @@
-# Reviewer AI
+# Orbit — Developer Cockpit
 
-Commit veya pull request incelemesi yapan küçük bir web uygulaması. Yerelde oturum açmış Codex CLI’ı kullanır; API anahtarı veya API kredisi gerektirmez. Diff, değişiklik metadatası, ilgili README ve isteğe bağlı inceleme notu Codex’e iletilir; sonuç yalnızca önceden tanımlı JSON şemasında kabul edilir.
+Yerel geliştirme akışını birden fazla proje bağlamında birleştiren kişisel developer paneli. İlk sürüm; ana dashboard, agent çalıştırabilen proje bazlı sürükle-bırak workflow, repository'yi salt-okunur inceleyen Coder Session, günlük çalışma hafızası ve mevcut AI code review aracını içerir.
+
+Workflow ve journal verileri tarayıcıda yerel olarak saklanır. AI modülleri kullanıcının bilgisayarında kurulu ve oturumu açık olan Codex veya Claude Code CLI üzerinden çalışır. Uygulama API anahtarı istemez, okumaz ve saklamaz. Diff, değişiklik metadatası, ilgili README ve isteğe bağlı inceleme notu seçilen yerel araca iletilir; review sonucu önceden tanımlı JSON şemasına göre doğrulanır.
 
 ## Çalıştırma
 
-Node.js 18 veya üstü, macOS ve Codex CLI gerekir. Codex’e ChatGPT hesabınızla giriş yapmış olmalısınız.
+Node.js 18 veya üstü, macOS ve desteklenen yerel araçlardan en az biri gerekir: Codex CLI veya Claude Code CLI. Kullanmak istediğiniz aracın kendi oturum açma akışını önceden tamamlamış olmalısınız.
 
 ```bash
-npm run codex:status
-# Oturum yoksa: codex login
-npm run review
+npm run dev
 ```
 
-Ardından `http://localhost:3000` adresini açın.
+Ardından `http://localhost:3000` adresini açın. AI Review ekranındaki proje seçiciden repository yolunu yazın veya `Finder’dan seç` ile repository klasörünü seçin; ardından inceleme türünü ve commit/PR hedefini girin. Bir proje seçilene kadar review alanları kilitli kalır.
 
-İncelemeler Codex hesabınızdaki kullanım kotasından harcanır. Uygulama API anahtarınızı veya ChatGPT oturum belirtecini okumaz; yalnızca kurulu Codex CLI komutunu çağırır. Her çalıştırma `read-only` sandbox ve `--ephemeral` modunda yürütülür. Reviewer projesi kendi başına Git repository’si olmak zorunda olmadığından CLI, yalnızca bu aracı başlatan süreçte `--skip-git-repo-check` ile çalışır; incelenecek Git bağlamı formdan sağlanır.
+AI çalışmaları seçilen yerel aracın hesabındaki kullanım kotasından harcanır. AI Review ve Coder Session salt-okunur/plan modunda çalışır. Workflow executor ise yalnızca seçilen repository için yazma izniyle çalışır; commit, push veya dış sisteme yazma yapmaz.
+
+## Agent kuralları ve yerel sağlayıcılar
+
+Her AI modülünün davranış sözleşmesi `agents/` klasöründe ayrı tutulur: `reviewer.md`, `coder.md`, `workflow.md` ve gerçek kod değişikliğini yapan `executor.md`. Kurallar modülün amacını, izinlerini, kapsamını ve çıktı sözleşmesini tanımlar; model sağlayıcısından bağımsızdır.
+
+Ortak sağlayıcı katmanı başlangıçta Codex ve Claude Code CLI araçlarını otomatik keşfeder. Arayüzden `Otomatik seçim`, `Codex` veya `Claude Code` seçilebilir. Otomatik seçim yalnızca kullanılabilir yerel araçlardan birini kullanır; uygulama içerisinde API token alanı veya secret saklama mekanizması bulunmaz.
+
+### Workflow iş puanı ve model profili
+
+Workflow görevleri kapsam için `2`, `3` veya `5` puan alır. Öncelik iş sırasını, puan ise Coder Session model profilini belirler:
+
+- `2`: küçük ve net işler — Codex için `gpt-5.6-luna` + `low`, Claude Code için `haiku`.
+- `3`: orta kapsamlı işler — Codex için `gpt-5.6-terra` + `medium`, Claude Code için `sonnet`.
+- `5`: çok adımlı veya riskli işler — Codex için `gpt-5.6-sol` + `high`, Claude Code için `opus`.
+
+Görev kartındaki puan düğmesi görevi Coder Session'a proje, açıklama ve puanıyla aktarır. Bu yönlendirme kesin bir token üst sınırı değildir; model kapasitesi ve reasoning seviyesi üzerinden kullanım/kalite dengesini yönetir. AI Review modeli ve çaba ayarı bu puanlardan bağımsız kalır.
+
+### Otomatik workflow çalışması ve review döngüsü
+
+Bir görev `Yapılıyor` kolonuna taşındığında seçilen yerel Codex veya Claude Code aracı arka planda otomatik başlar. Görev tamamlandığında kart kendiliğinden `Review` kolonuna geçer; agent özeti, değişen dosyalar, Git diff'i ve çalışma sohbeti kart üzerinde gösterilir.
+
+Review sırasında feedback yazıp kaydedebilirsiniz. Feedback tek başına kodu değiştirmez; kartı tekrar `Yapılıyor` kolonuna taşıdığınızda aynı sağlayıcı, model ve mümkün olduğunda aynı CLI oturumu devam ettirilerek yeni tur başlatılır. Agent çalışırken kart taşınamaz veya silinemez. Aynı repository üzerinde aynı anda yalnızca bir workflow görevi çalıştırılır.
+
+İlk agent turu başlamadan önce repository'nin çalışma ağacı temiz olmalıdır. Bu kontrol, kullanıcıya ait kaydedilmemiş değişikliklerin agent değişiklikleriyle karışmasını veya ezilmesini önler. İlk turdan sonra oluşan çalışma ağacı feedback turlarında aynı görev bağlamı olarak korunur.
+
+Workflow görevlerinin kendisi tarayıcı localStorage'ında kalır. Agent çalışma kayıtları, mesajlar, session kimliği ve review diff'i kullanıcıya özel `~/.config/ai-reviewer/workflow-runs.json` dosyasına kaydedilir. Sunucu çalışma ortasında kapanırsa kayıt güvenli biçimde `failed` durumuna alınır ve görev yeniden tetiklenebilir.
 
 Arayüzdeki model seçici Codex CLI’a `--model`, çaba seçici ise `model_reasoning_effort` yapılandırması olarak iletilir. Varsayılan seçim `gpt-5.6-terra` ve orta çabadır; daha düşük kota tüketimi için `gpt-5.6-luna` veya düşük çaba, kapsamlı inceleme için `gpt-5.6-sol` ve yüksek çaba seçilebilir. `gpt-5.5`, `gpt-5.4` ve `gpt-5.4-mini` de kullanılabilir. Seçtiğiniz modelin hesabınızda erişilebilir olması gerekir.
 
@@ -22,11 +48,17 @@ Codex Desktop’ın varsayılan macOS yolu otomatik algılanır. Farklı bir Cod
 
 ## Repository seçimi
 
-`npm run review` sırasıyla repository yolunu (veya kayıtlı proje kısayolunu), inceleme türünü ve hedefi sorar. `commit` seçildiğinde commit kimliği boş bırakılırsa `HEAD` kullanılır. `pr` seçildiğinde GitHub veya Azure DevOps pull request URL’sini ya da yalnızca PR numarasını girin.
+Review repository seçimi tamamen AI Review ekranından yapılır. Yol elle yazılabilir, kayıtlı proje kısayolu kullanılabilir veya macOS Finder üzerinden klasör seçilebilir. `commit` seçildiğinde commit alanı boş bırakılırsa `HEAD` kullanılır. `pr` seçildiğinde GitHub veya Azure DevOps pull request URL’sini ya da yalnızca PR numarasını girin. Workflow görevleri ve Coder Session kendi proje seçimine ve Finder butonuna sahiptir; bu nedenle aynı panoda farklı repository'lere ait işler tutulabilir.
+
+AI Review ve Workflow bağımsız modüllerdir. Review’de seçilen repository, sağlayıcı veya tamamlanan inceleme Workflow görevlerini oluşturmaz ya da değiştirmez. Her Workflow görevinin proje bilgisi yalnızca görev oluşturulurken verilen değerden gelir; Coder Session da kendi repository ve yerel LLM seçimini kullanır.
+
+Eski terminal akışı geriye dönük uyumluluk için `npm run review` komutuyla kullanılmaya devam edebilir, ancak normal kullanımda gerekli değildir.
 
 ### Kayıtlı projeler
 
-Repository yollarını kullanıcı bazında kaydetmek için bir kez `npm run projects` çalıştırın. Komut, proje kısayolu ve repository yolunu ister; sonrasında `npm run review` içinde yalnızca kısayolu (örneğin `webservice`) yazmanız yeterlidir. Tam yol girme davranışı değişmeden kalır.
+Finder’dan seçilen Git repository'leri otomatik olarak kullanıcıya özel yerel proje listesine kaydedilir. Elle yazılmış bir yolu kaydetmek için ilgili formdaki `Mevcut yolu kaydet` düğmesini kullanın. Kayıtlı projeler Review, Coder Session ve Workflow görev formlarında tıklanabilir bir liste olarak gösterilir; Finder’da tekrar klasör aramak gerekmez.
+
+Repository klasör adından kısa bir kısayol otomatik üretilir. Aynı adlı farklı repository'ler için `-2`, `-3` gibi güvenli ekler kullanılır. Terminalden ekleme ve silme yapmak isteyenler için `npm run projects` komutu kullanılmaya devam edebilir.
 
 Kayıtlar ortak repository’ye eklenmez: varsayılan olarak kullanıcının `~/.config/ai-reviewer/projects.json` dosyasında tutulur. Başka bir konum kullanmak için `AI_REVIEWER_PROJECTS_FILE`, klasör seçmek için `AI_REVIEWER_CONFIG_DIR` ortam değişkenini tanımlayabilirsiniz. Böylece her kullanıcı kendi yollarını yönetir; paylaşılan kodda kişisel klasör yolları bulunmaz.
 
@@ -34,12 +66,8 @@ PR incelemesinde uygulama, `origin` uzak bağlantısından PR’ın merge ref’
 
 Uygulama Git ile değişiklik bilgisini, diff’i, değişen dosyalara en yakın `README.md` belgelerini ve her değişen dosya için uygulanabilir `AGENTS.md` belgelerini otomatik yükler.
 
-```bash
-npm run review
-```
-
 Hedef yol, Reviewer uygulamasının bulunduğu klasör değil, incelenecek projenin Git repository kökü (veya içindeki bir klasör) olmalıdır. Uygulama başlığında yüklü repository ve kısa değişiklik kimliği görünür.
 
 ## Güvenlik
 
-Tarayıcı Codex kimlik bilgilerini görmez. Yerel sunucu, `/api/review` isteğini ayrı bir salt-okunur Codex CLI sürecine iletir.
+Tarayıcı yerel araçların kimlik bilgilerini görmez. Sunucu yalnızca seçilen CLI sürecini çağırır ve mevcut yerel oturumu kullanır; kimlik bilgilerini uygulamaya kopyalamaz.
