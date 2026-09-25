@@ -80,21 +80,29 @@ function codexSessionId(stdout) {
   return null;
 }
 
+export function codexExecArgs({ mode = 'plan', sessionId, model, effort, schemaPath, outputPath }) {
+  const args = sessionId
+    ? ['exec', 'resume', '--json']
+    : ['exec', '--sandbox', mode === 'execute' ? 'workspace-write' : 'read-only', '--json'];
+  if (mode === 'execute') {
+    if (sessionId) args.push('-c', 'sandbox_mode="workspace-write"');
+    args.push('-c', 'approval_policy="never"');
+  }
+  if (!sessionId && mode !== 'execute') args.push('--ephemeral');
+  if (model) args.push('--model', model);
+  if (effort) args.push('-c', `model_reasoning_effort="${effort}"`);
+  if (schemaPath) args.push('--output-schema', schemaPath);
+  args.push('-o', outputPath);
+  if (sessionId) args.push(sessionId);
+  args.push('-');
+  return args;
+}
+
 async function runCodex({ prompt, cwd, model, effort, schemaPath, structured, mode = 'plan', sessionId }) {
   const directory = await mkdtemp(join(tmpdir(), 'orbit-codex-'));
   try {
     const outputPath = join(directory, structured ? 'result.json' : 'result.md');
-    const args = sessionId
-      ? ['exec', 'resume', '--json']
-      : ['exec', '--sandbox', mode === 'execute' ? 'workspace-write' : 'read-only', '--json'];
-    if (!sessionId && mode === 'execute') args.push('--approve-for-me');
-    if (!sessionId && mode !== 'execute') args.push('--ephemeral');
-    if (model) args.push('--model', model);
-    if (effort) args.push('-c', `model_reasoning_effort="${effort}"`);
-    if (schemaPath) args.push('--output-schema', schemaPath);
-    args.push('-o', outputPath);
-    if (sessionId) args.push(sessionId);
-    args.push('-');
+    const args = codexExecArgs({ mode, sessionId, model, effort, schemaPath, outputPath });
     const { stdout } = await execute(binaries.codex, args, { cwd, input: prompt, maxBuffer: 8_000_000 });
     const output = (await readFile(outputPath, 'utf8')).trim();
     return { provider: 'codex', output: structured ? parseJsonText(output) : output, sessionId: sessionId || codexSessionId(stdout) };
