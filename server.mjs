@@ -11,6 +11,7 @@ import { isDirectory, loadProjects, saveProjects } from './project-config.mjs';
 import { providerStatuses, resolveLocalAgent, runLocalAgent } from './llm-providers.mjs';
 import { taskProfile } from './task-routing.mjs';
 import { loadWorkflowRuns, recoverInterruptedRuns, saveWorkflowRuns } from './workflow-runs.mjs';
+import { azureBoardsWiql, azureOrganizationUrl, normalizeAzureBoardItems } from './azure-boards.mjs';
 
 const root = new URL('.', import.meta.url).pathname;
 const port = Number(process.env.PORT || 3000);
@@ -234,6 +235,25 @@ async function gitAt(repositoryPath, args) {
   return (await run('git', ['-C', repositoryPath, ...args], { maxBuffer: 12_000_000 })).stdout;
 }
 
+async function azureBoardItems(input) {
+  const organization = azureOrganizationUrl(input.organization);
+  const project = typeof input.project === 'string' ? input.project.trim() : '';
+  if (!project) throw new Error('Azure Boards projesi gerekli.');
+  const assignee = typeof input.assignee === 'string' ? input.assignee.trim() : '@Me';
+  try {
+    const { stdout } = await run('az', [
+      'boards', 'query', '--org', organization, '--project', project,
+      '--wiql', azureBoardsWiql(assignee), '--output', 'json', '--only-show-errors'
+    ], { maxBuffer: 2_000_000 });
+    const workItems = normalizeAzureBoardItems(JSON.parse(stdout), organization, project);
+    return { organization, project, assignee: assignee || '@Me', workItems };
+  } catch (error) {
+    if (error.code === 'ENOENT') throw new Error('Azure CLI bulunamadı. Azure CLI ve azure-devops eklentisini kurup Azure DevOps oturumunu açın.');
+    const detail = error.stderr?.trim() || error.message;
+    throw new Error(`Azure Boards işleri okunamadı. Azure CLI oturumunu ve proje erişimini kontrol edin. ${detail}`);
+  }
+}
+
 async function workflowChanges(repositoryPath) {
   const statusText = await gitAt(repositoryPath, ['status', '--short']);
   return {
@@ -404,6 +424,14 @@ createServer(async (req, res) => {
   }
   if (req.method === 'GET' && req.url === '/api/workflow/runs') {
     return send(res, 200, { runs: [...workflowRuns.values()].map(publicWorkflowRun) });
+  }
+  if (req.method === 'POST' && req.url === '/api/azure-boards/import') {
+    try {
+      const input = await readJson(req, 20_000);
+      return send(res, 200, await azureBoardItems(input));
+    } catch (error) {
+      return send(res, 400, { error: error.message || 'Azure Boards işleri okunamadı.' });
+    }
   }
   const workflowStartMatch = req.url?.match(/^\/api\/workflow\/tasks\/([^/]+)\/start$/);
   if (req.method === 'POST' && workflowStartMatch) {

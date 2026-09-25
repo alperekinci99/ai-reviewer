@@ -156,6 +156,7 @@ button,input,textarea,select{font:inherit}
 .context-error p{margin:5px 0}
 .context-error code{display:block;padding:7px;background:#f4e8e5;overflow:auto}
 .kanban{display:grid;grid-template-columns:minmax(210px,.85fr) minmax(210px,.85fr) minmax(360px,1.45fr) minmax(210px,.85fr);gap:13px;align-items:start;overflow-x:auto;padding-bottom:12px}
+.workflow-actions{display:flex;align-items:center;gap:9px}
 .kanban-column{background:#e9ebe6;border-radius:9px;padding:12px;min-height:430px}
 .column-head{display:flex;justify-content:space-between;align-items:center;padding:4px 4px 13px}
 .column-head span:first-child{font:500 9px var(--mono);letter-spacing:1.1px;color:#646b67}
@@ -173,10 +174,13 @@ button,input,textarea,select{font:inherit}
 .task-card p{font-size:10px;line-height:1.55;color:#7e8480;margin:0}
 .task-footer{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:15px;font:9px var(--mono);color:#999e9b}
 .task-tag{max-width:145px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:4px 6px;border-radius:3px;background:#eef2e9;color:#5c745d}
+.task-project-select{max-width:145px;border:1px solid #d8e2d4;border-radius:4px;background:#f5f9f2;color:#526a57;padding:4px 5px;font:8px var(--mono);cursor:pointer}
 .task-points{flex:none;border:1px solid #dfe3dc;border-radius:4px;background:#f7f8f5;color:#69706c;padding:4px 6px;font:8px var(--mono)}
 .task-points.points-2{color:#567762}
 .task-points.points-3{color:#98703d}
 .task-points.points-5{border-color:#ead1cc;color:#a55043;background:#fff6f4}
+.azure-work-item{display:inline-block;margin-top:9px;color:#4b6f91;font:8px var(--mono);text-decoration:none}
+.azure-work-item:hover{text-decoration:underline}
 .run-state{display:flex;margin-top:13px;border-radius:6px;padding:10px;font-size:9px;line-height:1.5}
 .run-state.idle{border:1px dashed #dfe3dc;color:#8b918d;background:#fafbf8}
 .run-state.running{align-items:center;gap:9px;background:#f0f6eb;color:#46624e}

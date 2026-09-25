@@ -52,6 +52,14 @@ Review repository seçimi tamamen AI Review ekranından yapılır. Yol elle yaz�
 
 AI Review ve Workflow bağımsız modüllerdir. Review’de seçilen repository, sağlayıcı veya tamamlanan inceleme Workflow görevlerini oluşturmaz ya da değiştirmez. Her Workflow görevinin proje ve yerel LLM seçimi yalnızca görev oluşturulurken verilen değerden gelir.
 
+### Azure Boards’tan iş alma
+
+Workflow ekranındaki `Azure Boards’tan al` düğmesi, seçilen Azure DevOps organizasyonu ve proje için yalnızca `Backlog`, `Todo` (ve Azure’un varsayılan `To Do`) durumundaki işleri getirir. Atanan kişi alanında `@Me` varsayılandır; farklı bir ad veya e-posta ile başka bir kişinin işleri de filtrelenebilir. İçe alınan işler `Yapılacak` durumunda eklenir; her kartın üzerindeki repository seçicisinden yerel proje bağlanmadan agent başlatılamaz. Azure Boards’taki hiçbir alan değiştirilmez.
+
+Azure iş kartındaki `Story Points` değeri workflow puanına otomatik çevrilir: `0–2 → 2`, `3–4 → 3`, `5+ → 5`. Alan boşsa uyumlu varsayılan `3` kullanılır. Karttaki `AB#…` bağlantısı Azure work item’ını doğrudan açar; örneğin `FloTechnology` organizasyonundaki `Boards Management` projesinin `73694` numaralı işi `https://dev.azure.com/FloTechnology/Boards%20Management/_workitems/edit/73694` adresine gider.
+
+Bu özellik Azure CLI ile `azure-devops` eklentisinin kurulu ve Azure DevOps oturumunun açık olmasını gerektirir. Kimlik bilgileri tarayıcıya veya uygulama ayarlarına kaydedilmez; sorgu mevcut CLI oturumunu kullanır. Aynı Azure work item ikinci kez içe alınmaz.
+
 Eski terminal akışı geriye dönük uyumluluk için `npm run review` komutuyla kullanılmaya devam edebilir, ancak normal kullanımda gerekli değildir.
 
 ### Kayıtlı projeler

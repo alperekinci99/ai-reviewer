@@ -86,7 +86,7 @@
         </section>
 
         <section id="view-workflow" class="view" data-view-panel="workflow">
-          <div class="page-heading"><div><p class="eyebrow">PROJECT FLOW</p><h1>Workflow</h1><p>Görevi Yapılıyor’a taşı; yerel agent uygulasın, Review’da sen incele.</p></div><button class="primary-button" data-open-task type="button"><span>＋</span> Yeni görev</button></div>
+          <div class="page-heading"><div><p class="eyebrow">PROJECT FLOW</p><h1>Workflow</h1><p>Görevi Yapılıyor’a taşı; yerel agent uygulasın, Review’da sen incele.</p></div><div class="workflow-actions"><button id="azure-boards-import" class="secondary-button" type="button">Azure Boards’tan al</button><button class="primary-button" data-open-task type="button"><span>＋</span> Yeni görev</button></div></div>
           <div id="kanban" class="kanban" aria-label="Görev panosu"></div>
         </section>
 
@@ -122,6 +122,16 @@
         <label>Not<textarea name="description" rows="3" placeholder="Kısa bağlam veya kabul kriteri"></textarea></label>
         <div id="task-error" class="dialog-error" aria-live="polite"></div>
         <div class="dialog-actions"><button class="secondary-button" value="cancel" type="submit" formnovalidate>Vazgeç</button><button class="primary-button" value="default" type="submit">Görevi ekle</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="azure-boards-dialog" class="project-dialog">
+      <form id="azure-boards-form" method="dialog">
+        <div class="dialog-head"><div><span class="section-kicker">AZURE BOARDS</span><h2>İşleri içe aktar</h2><p>Yalnızca Backlog ve Todo durumundaki, seçilen kişiye atanmış işler Yapılacak kolonuna eklenir. Repository her kart üzerinden seçilir.</p></div><button class="dialog-close" value="cancel" type="submit" formnovalidate aria-label="Kapat">×</button></div>
+        <div class="dialog-grid"><label>Organizasyon<input name="organization" required autocomplete="url" placeholder="organizasyon veya https://dev.azure.com/..." /></label><label>Azure Boards projesi<input name="azureProject" required autocomplete="off" placeholder="Örn. Platform" /></label></div>
+        <label>Atanan kişi<input name="assignee" value="@Me" required autocomplete="off" placeholder="@Me veya ad / e-posta" /><small>@Me, Azure CLI ile oturum açmış hesabı kullanır.</small></label>
+        <div id="azure-boards-error" class="dialog-error" aria-live="polite"></div>
+        <div class="dialog-actions"><button class="secondary-button" value="cancel" type="submit" formnovalidate>Vazgeç</button><button class="primary-button" value="default" type="submit">İşleri al <span>↓</span></button></div>
       </form>
     </dialog>
 

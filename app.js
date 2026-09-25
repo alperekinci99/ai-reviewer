@@ -61,7 +61,7 @@ function loadState() {
         return {
           ...task,
           ...(legacyUpdate || {}),
-          project: legacyProject ? (seedTitles.has(task.title) ? 'Developer Portal' : 'Genel') : typeof task.project === 'string' && task.project.trim() ? task.project : 'Genel',
+          project: legacyProject ? (seedTitles.has(task.title) ? 'Developer Portal' : 'Genel') : typeof task.project === 'string' && task.project.trim() ? task.project : task.azureBoards ? '' : 'Genel',
           points: seedPoints[task.title] || ([2, 3, 5].includes(Number(task.points)) ? Number(task.points) : task.priority === 'high' ? 5 : task.priority === 'low' ? 2 : 3),
           workflowStarting: false
         };
@@ -265,14 +265,18 @@ function renderTasks() {
       const run = workflowRuns.get(task.id);
       const running = run?.status === 'running';
       const localError = task.workflowError && !['running', 'review'].includes(run?.status) ? `<div class="run-state failed"><b>Başlatılamadı</b><span>${escape(task.workflowError)}</span></div>` : '';
-      return `<article class="task-card${running ? ' is-running' : ''}${task.status === 'review' ? ' is-review' : ''}" draggable="${running ? 'false' : 'true'}" data-task-id="${escape(task.id)}"><div class="task-card-actions"><button class="task-menu" type="button" data-delete-task="${escape(task.id)}" aria-label="Görevi sil" ${running ? 'disabled' : ''}>×</button></div><h3>${escape(task.title)}</h3>${task.description ? `<p>${escape(task.description)}</p>` : ''}<div class="task-footer"><span class="task-tag">${escape(task.project || 'Projesiz')}</span><span class="task-points points-${points}" title="${escape(profile.codex)} · ${escape(profile.claude)}">${points} puan · ${escape(profile.label)}</span></div>${localError || workflowRunCard(task, run)}</article>`;
+      const azureLink = task.azureBoards?.url ? `<a class="azure-work-item" href="${escape(task.azureBoards.url)}" target="_blank" rel="noreferrer" title="Azure Boards #${escape(task.azureBoards.id)} işini aç">AB#${escape(task.azureBoards.id)}${task.azureBoards.storyPoints !== null && task.azureBoards.storyPoints !== undefined ? ` · SP ${escape(task.azureBoards.storyPoints)}` : ''} ↗</a>` : '';
+      const projectControl = task.azureBoards && !task.project
+        ? `<select class="task-project-select" data-task-project-select="${escape(task.id)}" aria-label="Repository seç"><option value="">Repository seç…</option>${savedProjects.map(project => `<option value="${escape(project.name)}">${escape(project.name)}</option>`).join('')}</select>`
+        : `<span class="task-tag">${escape(task.project || 'Projesiz')}</span>`;
+      return `<article class="task-card${running ? ' is-running' : ''}${task.status === 'review' ? ' is-review' : ''}" draggable="${running ? 'false' : 'true'}" data-task-id="${escape(task.id)}"><div class="task-card-actions"><button class="task-menu" type="button" data-delete-task="${escape(task.id)}" aria-label="Görevi sil" ${running ? 'disabled' : ''}>×</button></div><h3>${escape(task.title)}</h3>${task.description ? `<p>${escape(task.description)}</p>` : ''}<div class="task-footer">${projectControl}<span class="task-points points-${points}" title="${escape(profile.codex)} · ${escape(profile.claude)}">${points} puan · ${escape(profile.label)}</span></div>${azureLink}${localError || workflowRunCard(task, run)}</article>`;
     }).join('');
     return `<section class="kanban-column" data-status="${column.id}"><header class="column-head"><span>${column.label}</span><span class="column-count">${tasks.length}</span></header><div class="task-list">${cards}</div></section>`;
   }).join('');
 
   $$('.task-card').forEach(card => {
     card.addEventListener('dragstart', event => {
-      if (card.draggable === false || event.target.closest('button, textarea, input, form')) return event.preventDefault();
+      if (card.draggable === false || event.target.closest('button, a, textarea, input, select, form')) return event.preventDefault();
       card.classList.add('dragging');
     });
     card.addEventListener('dragend', () => card.classList.remove('dragging'));
@@ -298,6 +302,13 @@ function renderTasks() {
   $$('[data-delete-task]').forEach(button => button.addEventListener('click', async () => {
     await fetch(`/api/workflow/tasks/${encodeURIComponent(button.dataset.deleteTask)}`, { method: 'DELETE' }).catch(() => null);
     state.tasks = state.tasks.filter(task => task.id !== button.dataset.deleteTask);
+    persistAndRender();
+  }));
+  $$('[data-task-project-select]').forEach(select => select.addEventListener('change', event => {
+    const task = state.tasks.find(item => item.id === event.currentTarget.dataset.taskProjectSelect);
+    if (!task || !event.currentTarget.value) return;
+    task.project = event.currentTarget.value;
+    addActivity('⌁', `${task.title} için repository seçildi`, task.project);
     persistAndRender();
   }));
   $$('[data-open-workflow-details]').forEach(button => button.addEventListener('click', event => {
@@ -449,6 +460,8 @@ $('#complete-focus').addEventListener('click', event => {
 
 const taskDialog = $('#task-dialog');
 const taskForm = $('#task-form');
+const azureBoardsDialog = $('#azure-boards-dialog');
+const azureBoardsForm = $('#azure-boards-form');
 function updateTaskModelHint() {
   const points = taskPoints(taskForm.elements.points.value);
   const profile = taskProfiles[points];
@@ -474,6 +487,48 @@ taskForm.addEventListener('submit', event => {
   taskDialog.close();
   persistAndRender();
   showView('workflow');
+});
+
+$('#azure-boards-import').addEventListener('click', () => {
+  $('#azure-boards-error').textContent = '';
+  azureBoardsDialog.showModal();
+});
+
+azureBoardsForm.addEventListener('submit', async event => {
+  if (event.submitter?.value === 'cancel') return;
+  event.preventDefault();
+  const button = event.submitter;
+  const errorBox = $('#azure-boards-error');
+  const values = Object.fromEntries(new FormData(event.currentTarget));
+  button.disabled = true;
+  button.textContent = 'İşler alınıyor…';
+  errorBox.textContent = '';
+  try {
+    const response = await fetch('/api/azure-boards/import', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ organization: values.organization, project: values.azureProject, assignee: values.assignee })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Azure Boards işleri okunamadı.');
+    const imported = [];
+    let skipped = 0;
+    for (const item of data.workItems) {
+      const alreadyImported = state.tasks.some(task => task.azureBoards?.organization === data.organization
+        && task.azureBoards?.project === data.project && task.azureBoards?.id === item.id);
+      if (alreadyImported) { skipped += 1; continue; }
+      state.tasks.unshift({
+        id: crypto.randomUUID(), title: item.title, description: item.description,
+        project: '', points: item.workflowPoints, status: 'todo', createdAt: Date.now(),
+        azureBoards: { organization: data.organization, project: data.project, id: item.id, state: item.state, assignedTo: item.assignedTo, storyPoints: item.storyPoints, url: item.url }
+      });
+      imported.push(item);
+    }
+    addActivity('↓', 'Azure Boards işleri içe aktarıldı', `${imported.length} yeni iş${skipped ? ` · ${skipped} zaten panoda` : ''}`);
+    if (imported.length) addJournalEntry('Azure Boards senkronizasyonu', `${data.project} projesinden ${imported.length} iş Yapılacak kolonuna eklendi.`, ['azure-boards', 'workflow']);
+    persistAndRender();
+    azureBoardsDialog.close();
+  } catch (error) { errorBox.textContent = error.message; }
+  finally { button.disabled = false; button.innerHTML = 'İşleri al <span>↓</span>'; }
 });
 
 $('#add-journal').addEventListener('click', () => {
