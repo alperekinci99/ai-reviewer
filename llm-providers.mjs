@@ -15,6 +15,9 @@ const binaries = {
   codex: preferredBinary(codexCandidates),
   claude: preferredBinary(claudeCandidates)
 };
+let providerStatusCache = null;
+let providerStatusCachedAt = 0;
+const providerStatusTtl = 5 * 60_000;
 
 function execute(binary, args, { cwd, input, maxBuffer = 8_000_000 } = {}) {
   return new Promise((resolve, reject) => {
@@ -47,21 +50,31 @@ async function inspectClaude() {
   } catch { return { id: 'claude', name: 'Claude Code', installed: false, available: false, detail: 'Kurulu değil' }; }
 }
 
-export async function providerStatuses() {
-  return Promise.all([inspectCodex(), inspectClaude()]);
+export async function providerStatuses({ fresh = false } = {}) {
+  if (!fresh && providerStatusCache && Date.now() - providerStatusCachedAt < providerStatusTtl) return providerStatusCache;
+  providerStatusCache = await Promise.all([inspectCodex(), inspectClaude()]);
+  providerStatusCachedAt = Date.now();
+  return providerStatusCache;
 }
 
 async function selectProvider(requested = 'auto') {
-  const statuses = await providerStatuses();
-  if (requested === 'auto') {
-    const provider = statuses.find(status => status.available);
-    if (!provider) throw new Error('Kullanılabilir ve oturumu açık bir yerel LLM aracı bulunamadı.');
-    return provider.id;
+  if (requested !== 'auto') {
+    if (!['codex', 'claude'].includes(requested)) throw new Error(`Bilinmeyen LLM sağlayıcısı: ${requested}`);
+    return requested;
   }
-  const provider = statuses.find(status => status.id === requested);
-  if (!provider) throw new Error(`Bilinmeyen LLM sağlayıcısı: ${requested}`);
-  if (!provider.available) throw new Error(`${provider.name} kullanılamıyor: ${provider.detail}`);
+  const statuses = await providerStatuses();
+  const provider = statuses.find(status => status.available);
+  if (!provider) throw new Error('Kullanılabilir ve oturumu açık bir yerel LLM aracı bulunamadı.');
   return provider.id;
+}
+
+export async function resolveLocalAgent({ provider = 'auto', models, model, effort }) {
+  const selectedProvider = await selectProvider(provider);
+  return {
+    provider: selectedProvider,
+    model: models?.[selectedProvider] || model || 'varsayılan',
+    effort: selectedProvider === 'codex' ? effort || 'medium' : null
+  };
 }
 
 function parseJsonText(value) {
@@ -120,8 +133,10 @@ async function runClaude({ prompt, cwd, model, structured, mode = 'plan', sessio
 }
 
 export async function runLocalAgent(options) {
-  const provider = await selectProvider(options.provider);
-  const resolvedOptions = { ...options, model: options.models?.[provider] || options.model };
-  const result = provider === 'codex' ? await runCodex(resolvedOptions) : await runClaude(resolvedOptions);
-  return { ...result, model: resolvedOptions.model || 'varsayılan', effort: provider === 'codex' ? resolvedOptions.effort || 'medium' : null };
+  const selection = options.resolvedProvider
+    ? { provider: options.resolvedProvider, model: options.model || options.models?.[options.resolvedProvider] || 'varsayılan', effort: options.resolvedProvider === 'codex' ? options.effort || 'medium' : null }
+    : await resolveLocalAgent(options);
+  const resolvedOptions = { ...options, provider: selection.provider, model: selection.model, effort: selection.effort };
+  const result = selection.provider === 'codex' ? await runCodex(resolvedOptions) : await runClaude(resolvedOptions);
+  return { ...result, model: selection.model, effort: selection.effort };
 }

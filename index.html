@@ -124,6 +124,16 @@
         <div class="dialog-actions"><button class="secondary-button" value="cancel" type="submit" formnovalidate>Vazgeç</button><button class="primary-button" value="default" type="submit">Görevi ekle</button></div>
       </form>
     </dialog>
+
+    <dialog id="workflow-diff-dialog" class="workflow-diff-dialog">
+      <form method="dialog">
+        <div class="dialog-head"><div><span class="section-kicker">AGENT DEĞİŞİKLİKLERİ</span><h2 id="workflow-diff-title">Değişiklikleri incele</h2></div><button class="dialog-close" value="close" type="submit" aria-label="Kapat">×</button></div>
+        <div id="workflow-diff-files" class="changed-files"></div>
+        <p id="workflow-diff-empty" class="run-no-diff" hidden>Agent çalışma ağacında bir değişiklik üretmedi.</p>
+        <pre id="workflow-diff-preview"><code></code></pre>
+        <div class="dialog-actions"><button class="secondary-button" value="close" type="submit">Kapat</button></div>
+      </form>
+    </dialog>
     <script src="/app.js"></script>
   </body>
 </html>

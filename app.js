@@ -65,7 +65,8 @@ function loadState() {
           ...(legacyUpdate || {}),
           project: legacyProject ? (seedTitles.has(task.title) ? 'Developer Portal' : 'Genel') : typeof task.project === 'string' && task.project.trim() ? task.project : 'Genel',
           points: seedPoints[task.title] || ([2, 3, 5].includes(Number(task.points)) ? Number(task.points) : task.priority === 'high' ? 5 : task.priority === 'low' ? 2 : 3),
-          provider: typeof task.provider === 'string' ? task.provider : 'auto'
+          provider: typeof task.provider === 'string' ? task.provider : 'auto',
+          workflowStarting: false
         };
       }),
       activities: Array.isArray(saved.activities) ? saved.activities : defaults.activities,
@@ -187,22 +188,20 @@ const columns = [
 ];
 
 function workflowRunCard(task, run) {
+  if (task.workflowStarting) return '<div class="run-state running"><i></i><span><b>Agent başlatılıyor</b><small>Provider ve model hazırlandıktan sonra çalışma başlayacak.</small></span></div>';
   if (!run && task.status === 'doing') return '<div class="run-state idle">Hazır · yeniden tetiklemek için başka bir kolona, ardından Yapılıyor’a taşı.</div>';
   if (!run) return '';
   const provider = run.provider === 'claude' ? 'Claude Code' : run.provider === 'codex' ? 'Codex' : 'Yerel agent';
-  if (run.status === 'running') return `<div class="run-state running"><i></i><span><b>${escape(provider)} çalışıyor</b><small>${escape(run.model || 'model seçiliyor')} · ${run.attempt || 1}. tur</small></span></div>`;
+  if (run.status === 'running') return `<div class="run-state running"><i></i><span><b>${escape(provider)} çalışıyor</b><small>${escape(run.model || 'varsayılan model')} · ${run.attempt || 1}. tur</small></span></div>`;
   if (run.status === 'failed') return `<div class="run-state failed"><b>Çalışma tamamlanamadı</b><span>${escape(run.error || 'Bilinmeyen agent hatası')}</span></div>`;
   if (task.status !== 'review') return '';
   const messages = (run.messages || []).map(message => `<article class="chat-message ${message.role}"><span>${message.role === 'user' ? 'Sen' : provider}</span><p>${escape(message.content)}</p></article>`).join('');
-  const changedFiles = (run.changedFiles || []).map(file => `<span>${escape(file)}</span>`).join('');
-  const diff = run.diff
-    ? `<details class="run-diff"><summary>Diff’i incele <span>${run.changedFiles?.length || 0} dosya${run.diffTruncated ? ' · önizleme sınırlandı' : ''}</span></summary><pre><code>${escape(run.diff)}</code></pre></details>`
-    : '<div class="run-no-diff">Agent çalışma ağacında bir değişiklik üretmedi.</div>';
-  return `<section class="run-review"><header><span>AGENT REVIEW</span><b>${escape(provider)} · ${escape(run.model || '')} · ${run.attempt || 1}. tur</b></header>${changedFiles ? `<div class="changed-files">${changedFiles}</div>` : ''}<div class="run-summary">${escape(run.summary || '')}</div>${diff}<div class="agent-chat"><div class="agent-chat-head"><b>Agent sohbeti</b><span>Feedback kaydolur; tekrar Yapılıyor’a taşıyınca aynı oturum devam eder.</span></div>${messages}<form data-feedback-form="${escape(task.id)}"><textarea name="feedback" rows="3" maxlength="4000" required placeholder="Değişikliklerle ilgili feedback’ini yaz…"></textarea><button type="submit">Feedback’i kaydet</button><small aria-live="polite"></small></form></div></section>`;
+  return `<section class="run-review"><header><span>AGENT REVIEW</span><b>${escape(provider)} · ${escape(run.model || '')} · ${run.attempt || 1}. tur</b></header><div class="run-summary">${escape(run.summary || '')}</div><button class="review-diff-button" type="button" draggable="false" data-open-workflow-diff="${escape(task.id)}"><span>Değişiklikleri gör</span><small>${run.changedFiles?.length || 0} dosya${run.diffTruncated ? ' · önizleme sınırlandı' : ''} →</small></button><div class="agent-chat"><div class="agent-chat-head"><b>Agent sohbeti</b><span>Feedback gönderildiğinde aynı oturum otomatik olarak yeniden çalışır.</span></div>${messages}<form data-feedback-form="${escape(task.id)}"><textarea name="feedback" rows="3" maxlength="4000" required placeholder="Değişikliklerle ilgili feedback’ini yaz…"></textarea><button type="submit">Feedback’i gönder</button><small aria-live="polite"></small></form></div></section>`;
 }
 
-async function startWorkflowTask(task) {
+async function startWorkflowTask(task, { failureStatus } = {}) {
   delete task.workflowError;
+  task.workflowStarting = true;
   saveState();
   renderTasks();
   try {
@@ -213,11 +212,17 @@ async function startWorkflowTask(task) {
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Workflow görevi başlatılamadı.');
+    delete task.workflowStarting;
+    saveState();
     await syncWorkflowRuns();
+    return true;
   } catch (error) {
+    delete task.workflowStarting;
+    if (failureStatus) task.status = failureStatus;
     task.workflowError = error.message;
     addActivity('!', `${task.title} başlatılamadı`, error.message);
     persistAndRender();
+    return false;
   }
 }
 
@@ -246,7 +251,7 @@ function renderTasks() {
 
   $$('.task-card').forEach(card => {
     card.addEventListener('dragstart', event => {
-      if (card.draggable === false) return event.preventDefault();
+      if (card.draggable === false || event.target.closest('button, textarea, input, form')) return event.preventDefault();
       card.classList.add('dragging');
     });
     card.addEventListener('dragend', () => card.classList.remove('dragging'));
@@ -268,20 +273,37 @@ function renderTasks() {
     state.tasks = state.tasks.filter(task => task.id !== button.dataset.deleteTask);
     persistAndRender();
   }));
+  $$('[data-open-workflow-diff]').forEach(button => button.addEventListener('click', event => {
+    event.stopPropagation();
+    const task = state.tasks.find(item => item.id === button.dataset.openWorkflowDiff);
+    const run = workflowRuns.get(button.dataset.openWorkflowDiff);
+    if (!task || !run) return;
+    $('#workflow-diff-title').textContent = task.title;
+    $('#workflow-diff-files').innerHTML = (run.changedFiles || []).map(file => `<span>${escape(file)}</span>`).join('');
+    const preview = $('#workflow-diff-preview');
+    const empty = $('#workflow-diff-empty');
+    preview.hidden = !run.diff;
+    empty.hidden = Boolean(run.diff);
+    preview.querySelector('code').textContent = run.diff || '';
+    $('#workflow-diff-dialog').showModal();
+  }));
   $$('[data-feedback-form]').forEach(feedbackForm => feedbackForm.addEventListener('submit', async event => {
     event.preventDefault();
     const button = feedbackForm.querySelector('button');
     const status = feedbackForm.querySelector('small');
     const feedback = feedbackForm.elements.feedback.value.trim();
     button.disabled = true;
-    status.textContent = 'Kaydediliyor…';
+    status.textContent = 'Gönderiliyor…';
     try {
       const response = await fetch(`/api/workflow/tasks/${encodeURIComponent(feedbackForm.dataset.feedbackForm)}/feedback`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ feedback }) });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Feedback kaydedilemedi.');
-      feedbackForm.reset();
-      status.textContent = 'Kaydedildi. Görevi Yapılıyor’a taşıyarak agent’ı devam ettir.';
-      await syncWorkflowRuns();
+      if (!response.ok) throw new Error(data.error || 'Feedback gönderilemedi.');
+      const task = state.tasks.find(item => item.id === feedbackForm.dataset.feedbackForm);
+      if (!task) throw new Error('Workflow görevi bulunamadı.');
+      task.status = 'doing';
+      addActivity('↻', `${task.title} feedback ile yeniden başlatıldı`, 'Agent aynı çalışma oturumunda devam ediyor');
+      persistAndRender();
+      await startWorkflowTask(task, { failureStatus: 'review' });
     } catch (error) { status.textContent = error.message; }
     finally { button.disabled = false; }
   }));
@@ -364,6 +386,12 @@ async function syncWorkflowRuns() {
     for (const task of state.tasks) {
       const run = workflowRuns.get(task.id);
       if (!run) continue;
+      if (task.workflowStarting) {
+        if (run.status === 'running' || run.status === 'failed') {
+          delete task.workflowStarting;
+          stateChanged = true;
+        } else continue;
+      }
       if (run.status === 'review' && task.status === 'doing') {
         task.status = 'review';
         delete task.workflowError;

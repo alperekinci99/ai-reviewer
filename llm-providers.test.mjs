@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { codexExecArgs } from './llm-providers.mjs';
+import { codexExecArgs, resolveLocalAgent } from './llm-providers.mjs';
 
 test('workflow executor çakışan approve-for-me bayrağı olmadan workspace-write kullanır', () => {
   const args = codexExecArgs({ mode: 'execute', model: 'gpt-5.6-terra', effort: 'medium', outputPath: '/tmp/result.md' });
@@ -17,4 +17,14 @@ test('devam turu aynı güvenlik sınırlarını config üzerinden korur', () =>
   assert.ok(args.includes('sandbox_mode="workspace-write"'));
   assert.ok(args.includes('approval_policy="never"'));
   assert.ok(args.includes('session-123'));
+});
+
+test('seçili provider için model çalışma başlamadan belirlenir', async () => {
+  const selection = await resolveLocalAgent({
+    provider: 'codex',
+    models: { codex: 'gpt-5.6-terra', claude: 'sonnet' },
+    effort: 'medium'
+  });
+
+  assert.deepEqual(selection, { provider: 'codex', model: 'gpt-5.6-terra', effort: 'medium' });
 });

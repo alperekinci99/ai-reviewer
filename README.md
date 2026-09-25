@@ -36,7 +36,7 @@ Yeni görev formunda yerel LLM aracı seçilebilir. Puan yönlendirmesi kesin bi
 
 Bir görev `Yapılıyor` kolonuna taşındığında seçilen yerel Codex veya Claude Code aracı arka planda otomatik başlar. Görev tamamlandığında kart kendiliğinden `Review` kolonuna geçer; agent özeti, değişen dosyalar, Git diff'i ve çalışma sohbeti kart üzerinde gösterilir.
 
-Review sırasında feedback yazıp kaydedebilirsiniz. Feedback tek başına kodu değiştirmez; kartı tekrar `Yapılıyor` kolonuna taşıdığınızda aynı sağlayıcı, model ve mümkün olduğunda aynı CLI oturumu devam ettirilerek yeni tur başlatılır. Agent çalışırken kart taşınamaz veya silinemez. Aynı repository üzerinde aynı anda yalnızca bir workflow görevi çalıştırılır.
+Review sırasında feedback gönderebilirsiniz. Feedback gönderildiği anda görev otomatik olarak `Yapılıyor` kolonuna döner; aynı sağlayıcı, model ve mümkün olduğunda aynı CLI oturumu devam ettirilerek yeni tur başlatılır. Yapılan dosya değişiklikleri kartı büyütmeden `Değişiklikleri gör` penceresinde açılır. Agent çalışırken kart taşınamaz veya silinemez. Aynı repository üzerinde aynı anda yalnızca bir workflow görevi çalıştırılır.
 
 İlk agent turu başlamadan önce repository'nin çalışma ağacı temiz olmalıdır. Bu kontrol, kullanıcıya ait kaydedilmemiş değişikliklerin agent değişiklikleriyle karışmasını veya ezilmesini önler. İlk turdan sonra oluşan çalışma ağacı feedback turlarında aynı görev bağlamı olarak korunur.
 

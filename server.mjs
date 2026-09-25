@@ -8,7 +8,7 @@ import { homedir } from 'node:os';
 import { limitReviewToChangedCode } from './review-scope.mjs';
 import { azurePullRequestUrl } from './pr-url.mjs';
 import { isDirectory, loadProjects, saveProjects } from './project-config.mjs';
-import { providerStatuses, runLocalAgent } from './llm-providers.mjs';
+import { providerStatuses, resolveLocalAgent, runLocalAgent } from './llm-providers.mjs';
 import { taskProfile } from './task-routing.mjs';
 import { loadWorkflowRuns, recoverInterruptedRuns, saveWorkflowRuns } from './workflow-runs.mjs';
 
@@ -280,11 +280,11 @@ async function executeWorkflowTask(runState, profile, isResume) {
   try {
     const prompt = `${await agentRule('executor')}\n\n${isResume ? workflowFeedbackPrompt(runState) : workflowTaskPrompt(runState.task, profile)}`;
     const result = await runLocalAgent({
-      provider: runState.provider,
+      resolvedProvider: runState.provider,
       prompt,
       cwd: runState.repositoryPath,
-      models: { codex: profile.codex.model, claude: profile.claude.model },
-      effort: profile.codex.effort,
+      model: runState.model,
+      effort: runState.effort,
       structured: false,
       mode: 'execute',
       sessionId: isResume ? runState.sessionId : null
@@ -326,6 +326,9 @@ async function startWorkflowTask(id, input) {
     if (dirty) throw new Error('Repository’de kaydedilmemiş değişiklikler var. Mevcut çalışmanı commit/stash yaptıktan sonra görevi yeniden Yapılıyor’a taşı; böylece agent yalnızca kendi değişiklikleri üzerinde çalışır.');
   }
   const isResume = Boolean(existing?.sessionId);
+  const agentSelection = await resolveLocalAgent(isResume
+    ? { provider: existing.provider, model: existing.model, effort: existing.effort }
+    : { provider: input.provider || 'auto', models: { codex: profile.codex.model, claude: profile.claude.model }, effort: profile.codex.effort });
   const now = new Date().toISOString();
   const task = { title: input.title.trim(), description: String(input.description || '').trim(), project: input.project.trim(), points: profile.points };
   const runState = {
@@ -336,9 +339,9 @@ async function startWorkflowTask(id, input) {
     baseCommit: existing?.baseCommit || (await gitAt(repositoryPath, ['rev-parse', 'HEAD'])).trim(),
     status: 'running',
     error: null,
-    provider: existing?.provider || input.provider || 'auto',
-    model: existing?.model || null,
-    effort: existing?.effort || null,
+    provider: agentSelection.provider,
+    model: agentSelection.model,
+    effort: agentSelection.effort,
     attempt: (existing?.attempt || 0) + 1,
     startedAt: existing?.startedAt || now,
     updatedAt: now,
@@ -452,7 +455,7 @@ createServer(async (req, res) => {
       await persistWorkflowRuns();
       return send(res, 200, { run: workflowRun });
     } catch (error) {
-      return send(res, 400, { error: error.message || 'Feedback kaydedilemedi.' });
+      return send(res, 400, { error: error.message || 'Feedback gönderilemedi.' });
     }
   }
   const workflowDeleteMatch = req.url?.match(/^\/api\/workflow\/tasks\/([^/]+)$/);
