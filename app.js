@@ -185,16 +185,39 @@ const columns = [
   { id: 'done', label: 'TAMAMLANDI' }
 ];
 
+const workflowProviderLabel = provider => provider === 'claude' ? 'Claude Code' : provider === 'codex' ? 'Codex' : 'Yerel agent';
+
 function workflowRunCard(task, run) {
   if (task.workflowStarting) return '<div class="run-state running"><i></i><span><b>Agent başlatılıyor</b><small>Provider ve model hazırlandıktan sonra çalışma başlayacak.</small></span></div>';
   if (!run && task.status === 'doing') return '<div class="run-state idle">Hazır · yeniden tetiklemek için başka bir kolona, ardından Yapılıyor’a taşı.</div>';
   if (!run) return '';
-  const provider = run.provider === 'claude' ? 'Claude Code' : run.provider === 'codex' ? 'Codex' : 'Yerel agent';
+  const provider = workflowProviderLabel(run.provider);
   if (run.status === 'running') return `<div class="run-state running"><i></i><span><b>${escape(provider)} çalışıyor</b><small>${escape(run.model || 'varsayılan model')} · ${run.attempt || 1}. tur</small></span></div>`;
   if (run.status === 'failed') return `<div class="run-state failed"><b>Çalışma tamamlanamadı</b><span>${escape(run.error || 'Bilinmeyen agent hatası')}</span></div>`;
   if (task.status !== 'review') return '';
-  const messages = (run.messages || []).map(message => `<article class="chat-message ${message.role}"><span>${message.role === 'user' ? 'Sen' : provider}</span><p>${escape(message.content)}</p></article>`).join('');
-  return `<section class="run-review"><header><span>AGENT REVIEW</span><b>${escape(provider)} · ${escape(run.model || '')} · ${run.attempt || 1}. tur</b></header><div class="run-summary">${escape(run.summary || '')}</div><button class="review-diff-button" type="button" draggable="false" data-open-workflow-diff="${escape(task.id)}"><span>Değişiklikleri gör</span><small>${run.changedFiles?.length || 0} dosya${run.diffTruncated ? ' · önizleme sınırlandı' : ''} →</small></button><div class="agent-chat"><div class="agent-chat-head"><b>Agent sohbeti</b><span>Feedback gönderildiğinde aynı oturum otomatik olarak yeniden çalışır.</span></div>${messages}<form data-feedback-form="${escape(task.id)}"><textarea name="feedback" rows="3" maxlength="4000" required placeholder="Değişikliklerle ilgili feedback’ini yaz…"></textarea><button type="submit">Feedback’i gönder</button><small aria-live="polite"></small></form></div></section>`;
+  return `<div class="review-ready"><div><b>Review’a hazır</b><small>${escape(provider)} · ${escape(run.model || '')} · ${run.changedFiles?.length || 0} değişen dosya</small></div><button type="button" draggable="false" data-open-workflow-details="${escape(task.id)}">Detayları gör <span>→</span></button></div>`;
+}
+
+function openWorkflowTaskDetails(taskId) {
+  const task = state.tasks.find(item => item.id === taskId);
+  const run = workflowRuns.get(taskId);
+  if (!task || !run || run.status !== 'review') return;
+  const provider = workflowProviderLabel(run.provider);
+  const dialog = $('#workflow-task-dialog');
+  dialog.dataset.taskId = taskId;
+  $('#workflow-task-title').textContent = task.title;
+  $('#workflow-task-meta').innerHTML = `<span>${escape(task.project || 'Projesiz')}</span><span>${taskPoints(task.points)} puan</span><span>${escape(provider)}</span><span>${escape(run.model || 'varsayılan model')}</span><span>${run.attempt || 1}. tur</span>`;
+  $('#workflow-task-description').textContent = task.description || 'Ek görev açıklaması bulunmuyor.';
+  $('#workflow-task-summary').textContent = run.summary || 'Agent özeti bulunmuyor.';
+  $('#workflow-task-files').innerHTML = (run.changedFiles || []).map(file => `<span>${escape(file)}</span>`).join('');
+  $('#workflow-task-change-count').textContent = `${run.changedFiles?.length || 0} dosya`;
+  $('#workflow-task-files-empty').hidden = Boolean(run.changedFiles?.length);
+  $('#workflow-task-chat').innerHTML = (run.messages || []).map(message => `<article class="chat-message ${message.role}"><span>${message.role === 'user' ? 'Sen' : escape(provider)}</span><p>${escape(message.content)}</p></article>`).join('');
+  const feedbackForm = $('#workflow-task-feedback');
+  feedbackForm.dataset.taskId = taskId;
+  feedbackForm.reset();
+  feedbackForm.querySelector('small').textContent = '';
+  if (!dialog.open) dialog.showModal();
 }
 
 async function startWorkflowTask(task, { failureStatus } = {}) {
@@ -253,6 +276,12 @@ function renderTasks() {
       card.classList.add('dragging');
     });
     card.addEventListener('dragend', () => card.classList.remove('dragging'));
+    const task = state.tasks.find(item => item.id === card.dataset.taskId);
+    if (task?.status === 'review' && workflowRuns.get(task.id)?.status === 'review') {
+      card.addEventListener('click', event => {
+        if (!event.target.closest('button, textarea, input, form')) openWorkflowTaskDetails(task.id);
+      });
+    }
   });
   $$('.kanban-column').forEach(column => {
     column.addEventListener('dragover', event => { event.preventDefault(); column.classList.add('dragover'); });
@@ -271,41 +300,35 @@ function renderTasks() {
     state.tasks = state.tasks.filter(task => task.id !== button.dataset.deleteTask);
     persistAndRender();
   }));
-  $$('[data-open-workflow-diff]').forEach(button => button.addEventListener('click', event => {
+  $$('[data-open-workflow-details]').forEach(button => button.addEventListener('click', event => {
     event.stopPropagation();
-    const task = state.tasks.find(item => item.id === button.dataset.openWorkflowDiff);
-    const run = workflowRuns.get(button.dataset.openWorkflowDiff);
-    if (!task || !run) return;
-    $('#workflow-diff-title').textContent = task.title;
-    $('#workflow-diff-files').innerHTML = (run.changedFiles || []).map(file => `<span>${escape(file)}</span>`).join('');
-    const preview = $('#workflow-diff-preview');
-    const empty = $('#workflow-diff-empty');
-    preview.hidden = !run.diff;
-    empty.hidden = Boolean(run.diff);
-    preview.querySelector('code').textContent = run.diff || '';
-    $('#workflow-diff-dialog').showModal();
-  }));
-  $$('[data-feedback-form]').forEach(feedbackForm => feedbackForm.addEventListener('submit', async event => {
-    event.preventDefault();
-    const button = feedbackForm.querySelector('button');
-    const status = feedbackForm.querySelector('small');
-    const feedback = feedbackForm.elements.feedback.value.trim();
-    button.disabled = true;
-    status.textContent = 'Gönderiliyor…';
-    try {
-      const response = await fetch(`/api/workflow/tasks/${encodeURIComponent(feedbackForm.dataset.feedbackForm)}/feedback`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ feedback }) });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Feedback gönderilemedi.');
-      const task = state.tasks.find(item => item.id === feedbackForm.dataset.feedbackForm);
-      if (!task) throw new Error('Workflow görevi bulunamadı.');
-      task.status = 'doing';
-      addActivity('↻', `${task.title} feedback ile yeniden başlatıldı`, 'Agent aynı çalışma oturumunda devam ediyor');
-      persistAndRender();
-      await startWorkflowTask(task, { failureStatus: 'review' });
-    } catch (error) { status.textContent = error.message; }
-    finally { button.disabled = false; }
+    openWorkflowTaskDetails(button.dataset.openWorkflowDetails);
   }));
 }
+
+$('#workflow-task-close').addEventListener('click', () => $('#workflow-task-dialog').close());
+$('#workflow-task-feedback').addEventListener('submit', async event => {
+  event.preventDefault();
+  const feedbackForm = event.currentTarget;
+  const button = feedbackForm.querySelector('button');
+  const status = feedbackForm.querySelector('small');
+  const feedback = feedbackForm.elements.feedback.value.trim();
+  button.disabled = true;
+  status.textContent = 'Gönderiliyor…';
+  try {
+    const response = await fetch(`/api/workflow/tasks/${encodeURIComponent(feedbackForm.dataset.taskId)}/feedback`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ feedback }) });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Feedback gönderilemedi.');
+    const task = state.tasks.find(item => item.id === feedbackForm.dataset.taskId);
+    if (!task) throw new Error('Workflow görevi bulunamadı.');
+    $('#workflow-task-dialog').close();
+    task.status = 'doing';
+    addActivity('↻', `${task.title} feedback ile yeniden başlatıldı`, 'Agent aynı çalışma oturumunda devam ediyor');
+    persistAndRender();
+    await startWorkflowTask(task, { failureStatus: 'review' });
+  } catch (error) { status.textContent = error.message; }
+  finally { button.disabled = false; }
+});
 
 function addActivity(icon, title, detail) {
   state.activities.unshift({ icon, title, detail, at: timeLabel() });
@@ -360,7 +383,7 @@ function renderJournal() {
   const isToday = selectedJournalDate === dateKey(today);
   $('#journal-date-title').textContent = isToday ? 'Bugün' : new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }).format(selected);
   const entries = state.journal[selectedJournalDate] || [];
-  $('#journal-entries').innerHTML = entries.length ? entries.map(entry => `<article class="journal-entry"><time>${escape(entry.time)}</time><h3>${escape(entry.title)}</h3><p>${escape(entry.text)}</p><div class="journal-tags">${entry.tags.map(tag => `<span>${escape(tag)}</span>`).join('')}</div></article>`).join('') : '<div class="journal-empty">Bu gün için henüz bir çalışma notu yok.</div>';
+  $('#journal-entries').innerHTML = entries.length ? entries.map(entry => `<article class="journal-entry"><time>${escape(entry.time)}</time><h3>${escape(entry.title)}</h3></article>`).join('') : '<div class="journal-empty">Bu gün için henüz bir çalışma notu yok.</div>';
   renderCalendar();
 }
 

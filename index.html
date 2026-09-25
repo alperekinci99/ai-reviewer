@@ -125,14 +125,15 @@
       </form>
     </dialog>
 
-    <dialog id="workflow-diff-dialog" class="workflow-diff-dialog">
-      <form method="dialog">
-        <div class="dialog-head"><div><span class="section-kicker">AGENT DEĞİŞİKLİKLERİ</span><h2 id="workflow-diff-title">Değişiklikleri incele</h2></div><button class="dialog-close" value="close" type="submit" aria-label="Kapat">×</button></div>
-        <div id="workflow-diff-files" class="changed-files"></div>
-        <p id="workflow-diff-empty" class="run-no-diff" hidden>Agent çalışma ağacında bir değişiklik üretmedi.</p>
-        <pre id="workflow-diff-preview"><code></code></pre>
-        <div class="dialog-actions"><button class="secondary-button" value="close" type="submit">Kapat</button></div>
-      </form>
+    <dialog id="workflow-task-dialog" class="workflow-task-dialog">
+      <div class="workflow-task-dialog-shell">
+        <div class="dialog-head"><div><span class="section-kicker">WORKFLOW REVIEW</span><h2 id="workflow-task-title">Görev detayları</h2></div><button id="workflow-task-close" class="dialog-close" type="button" aria-label="Kapat">×</button></div>
+        <div id="workflow-task-meta" class="workflow-task-meta"></div>
+        <section class="workflow-detail-section"><span class="section-kicker">GÖREV</span><p id="workflow-task-description"></p></section>
+        <section class="workflow-detail-section"><span class="section-kicker">AGENT ÖZETİ</span><pre id="workflow-task-summary"></pre></section>
+        <section class="workflow-detail-section"><div class="workflow-detail-heading"><span class="section-kicker">DEĞİŞEN DOSYALAR</span><small id="workflow-task-change-count"></small></div><div id="workflow-task-files" class="changed-files"></div><p id="workflow-task-files-empty" class="run-no-diff" hidden>Agent çalışma ağacında bir dosya değişikliği üretmedi.</p></section>
+        <section class="workflow-detail-section"><div class="agent-chat-head"><b>Agent sohbeti</b><span>Feedback gönderildiğinde aynı oturum otomatik olarak yeniden çalışır.</span></div><div id="workflow-task-chat"></div><form id="workflow-task-feedback"><textarea name="feedback" rows="3" maxlength="4000" required placeholder="Değişikliklerle ilgili feedback’ini yaz…"></textarea><div class="workflow-feedback-actions"><small aria-live="polite"></small><button type="submit">Feedback’i gönder</button></div></form></section>
+      </div>
     </dialog>
     <script src="/app.js"></script>
   </body>

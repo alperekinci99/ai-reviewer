@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { lstat, readFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { basename, extname, join } from 'node:path';
 import { existsSync } from 'node:fs';
 import { execFile } from 'node:child_process';
@@ -29,11 +29,11 @@ const supportedProviders = new Set(['auto', 'codex', 'claude']);
 
 const agentRules = new Map();
 const storedWorkflowRuns = await loadWorkflowRuns();
-const recoveredWorkflowRuns = recoverInterruptedRuns(storedWorkflowRuns);
+const recoveredWorkflowRuns = recoverInterruptedRuns(storedWorkflowRuns).map(publicWorkflowRun);
 const workflowRuns = new Map(recoveredWorkflowRuns.map(item => [item.id, item]));
 let workflowSaveQueue = Promise.resolve();
 
-if (recoveredWorkflowRuns.some((run, index) => run.status !== storedWorkflowRuns[index]?.status)) {
+if (storedWorkflowRuns.some(run => Object.hasOwn(run, 'diff') || Object.hasOwn(run, 'diffTruncated')) || recoveredWorkflowRuns.some((run, index) => run.status !== storedWorkflowRuns[index]?.status)) {
   await saveWorkflowRuns(recoveredWorkflowRuns);
 }
 
@@ -50,6 +50,11 @@ function persistWorkflowRuns() {
   const snapshot = [...workflowRuns.values()];
   workflowSaveQueue = workflowSaveQueue.then(() => saveWorkflowRuns(snapshot));
   return workflowSaveQueue;
+}
+
+function publicWorkflowRun(runState) {
+  const { diff, diffTruncated, ...publicState } = runState;
+  return publicState;
 }
 
 function readJson(req, maxLength = 50_000) {
@@ -229,38 +234,9 @@ async function gitAt(repositoryPath, args) {
   return (await run('git', ['-C', repositoryPath, ...args], { maxBuffer: 12_000_000 })).stdout;
 }
 
-async function workflowDiff(repositoryPath) {
-  const [trackedDiff, statusText, untrackedText] = await Promise.all([
-    gitAt(repositoryPath, ['diff', '--no-ext-diff', '--no-renames', '--']),
-    gitAt(repositoryPath, ['status', '--short']),
-    gitAt(repositoryPath, ['ls-files', '--others', '--exclude-standard'])
-  ]);
-  const untrackedFiles = untrackedText.trim().split('\n').filter(Boolean);
-  const untrackedDiffs = [];
-  for (const file of untrackedFiles) {
-    try {
-      const absoluteFile = join(repositoryPath, file);
-      const fileStat = await lstat(absoluteFile);
-      if (!fileStat.isFile()) {
-        untrackedDiffs.push(`diff --git a/${file} b/${file}\nnew non-regular file\n`);
-        continue;
-      }
-      if (fileStat.size > 600_000) {
-        untrackedDiffs.push(`diff --git a/${file} b/${file}\nnew file (${fileStat.size} bytes; içerik önizlenmedi)\n`);
-        continue;
-      }
-      const content = await readFile(absoluteFile);
-      const rendered = content.includes(0)
-        ? `diff --git a/${file} b/${file}\nnew file (binary)\n`
-        : `diff --git a/${file} b/${file}\nnew file mode 100644\n--- /dev/null\n+++ b/${file}\n@@ -0,0 +1,${content.toString('utf8').split('\n').length} @@\n${content.toString('utf8').split('\n').map(line => `+${line}`).join('\n')}\n`;
-      untrackedDiffs.push(rendered);
-    } catch { /* File may have disappeared after status was read. */ }
-  }
-  const fullDiff = [trackedDiff.trim(), ...untrackedDiffs].filter(Boolean).join('\n\n');
-  const limit = 600_000;
+async function workflowChanges(repositoryPath) {
+  const statusText = await gitAt(repositoryPath, ['status', '--short']);
   return {
-    diff: fullDiff.length > limit ? `${fullDiff.slice(0, limit)}\n\n... diff önizlemesi 600 KB ile sınırlandı ...` : fullDiff,
-    diffTruncated: fullDiff.length > limit,
     changedFiles: statusText.trim().split('\n').filter(Boolean).map(line => line.slice(3).replace(/^"|"$/g, ''))
   };
 }
@@ -289,7 +265,9 @@ async function executeWorkflowTask(runState, profile, isResume) {
       mode: 'execute',
       sessionId: isResume ? runState.sessionId : null
     });
-    const changes = await workflowDiff(runState.repositoryPath);
+    const changes = await workflowChanges(runState.repositoryPath);
+    delete runState.diff;
+    delete runState.diffTruncated;
     Object.assign(runState, changes, {
       status: 'review',
       provider: result.provider,
@@ -425,7 +403,7 @@ createServer(async (req, res) => {
     }
   }
   if (req.method === 'GET' && req.url === '/api/workflow/runs') {
-    return send(res, 200, { runs: [...workflowRuns.values()] });
+    return send(res, 200, { runs: [...workflowRuns.values()].map(publicWorkflowRun) });
   }
   const workflowStartMatch = req.url?.match(/^\/api\/workflow\/tasks\/([^/]+)\/start$/);
   if (req.method === 'POST' && workflowStartMatch) {
