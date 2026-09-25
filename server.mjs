@@ -225,20 +225,6 @@ async function runReviewAgent(prompt, provider, model, reasoningEffort) {
   return { review: result.output, provider: result.provider };
 }
 
-async function runCoderAgent(task, provider, cwd, complexity) {
-  const profile = taskProfile(complexity);
-  const prompt = `${await agentRule('coder')}\n\n## İş profili\n\nPuan: ${profile.points}/5 (${profile.label})\nBu puana uygun kapsamda analiz yap; düşük puanlı işi gereksiz genişletme, yüksek puanlı işte bağımlılık ve riskleri daha kapsamlı doğrula.\n\n## Kullanıcı görevi\n\n${task}`;
-  const result = await runLocalAgent({
-    provider,
-    prompt,
-    cwd,
-    models: { codex: profile.codex.model, claude: profile.claude.model },
-    effort: profile.codex.effort,
-    structured: false
-  });
-  return { plan: result.output, provider: result.provider, model: result.model, effort: result.effort, complexity: profile.points };
-}
-
 async function gitAt(repositoryPath, args) {
   return (await run('git', ['-C', repositoryPath, ...args], { maxBuffer: 12_000_000 })).stdout;
 }
@@ -481,29 +467,6 @@ createServer(async (req, res) => {
   if (req.method === 'GET' && req.url === '/api/status') {
     const providers = await providerStatuses();
     return send(res, 200, { connected: providers.some(provider => provider.available), providers });
-  }
-  if (req.method === 'POST' && req.url === '/api/code-plan') {
-    let raw = '';
-    req.on('data', chunk => { raw += chunk; if (raw.length > 50_000) req.destroy(); });
-    req.on('end', async () => {
-      try {
-        const input = JSON.parse(raw);
-        const task = typeof input.prompt === 'string' ? input.prompt.trim() : '';
-        if (!task) return send(res, 400, { error: 'Planlanacak görevi yazın.' });
-        if (task.length > 2_000) return send(res, 400, { error: 'Görev açıklaması en fazla 2000 karakter olabilir.' });
-        if (!supportedProviders.has(input.provider || 'auto')) return send(res, 400, { error: 'Geçersiz yerel LLM sağlayıcısı.' });
-        const complexity = Number(input.complexity ?? 3);
-        if (![2, 3, 5].includes(complexity)) return send(res, 400, { error: 'İş puanı yalnızca 2, 3 veya 5 olabilir.' });
-        const coderRepoPath = await resolveRepository(input.repository);
-        await run('git', ['-C', coderRepoPath, 'rev-parse', '--is-inside-work-tree']);
-        const result = await runCoderAgent(task, input.provider || 'auto', coderRepoPath, complexity);
-        send(res, 200, result);
-      } catch (error) {
-        console.error('Coder planlama hatası:', error.message);
-        send(res, 500, { error: error.message || 'Coder planı oluşturulamadı.' });
-      }
-    });
-    return;
   }
   if (req.method === 'POST' && req.url === '/api/review') {
     let raw = '';

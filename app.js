@@ -15,12 +15,12 @@ const taskPoints = value => [2, 3, 5].includes(Number(value)) ? Number(value) : 
 const defaults = {
   reviews: 0,
   reviewProvider: 'auto',
-  coderProvider: 'auto',
+  workflowProvider: 'auto',
   tasks: [
-    { id: crypto.randomUUID(), title: 'Developer portal iskeletini tamamla', description: 'Ana modüller ve proje odaklı navigasyon.', project: 'Developer Portal', points: 5, status: 'doing', priority: 'high', createdAt: Date.now() },
-    { id: crypto.randomUUID(), title: 'Workflow görevlerine proje bağlamı ekle', description: 'Her görev kendi projesini bağımsız olarak taşısın.', project: 'Developer Portal', points: 3, status: 'todo', priority: 'medium', createdAt: Date.now() - 1000 },
-    { id: crypto.randomUUID(), title: 'Proje seçim deneyimini tasarla', description: 'Kayıtlı repository’ler arasında hızlı geçiş.', project: 'Developer Portal', points: 3, status: 'todo', priority: 'low', createdAt: Date.now() - 2000 },
-    { id: crypto.randomUUID(), title: 'Local state kalıcılığını doğrula', description: 'Workflow durumunun tarayıcıda korunduğunu doğrula.', project: 'Developer Portal', points: 2, status: 'done', priority: 'high', createdAt: Date.now() - 3000 }
+    { id: crypto.randomUUID(), title: 'Developer portal iskeletini tamamla', description: 'Ana modüller ve proje odaklı navigasyon.', project: 'Developer Portal', provider: 'auto', points: 5, status: 'doing', priority: 'high', createdAt: Date.now() },
+    { id: crypto.randomUUID(), title: 'Workflow görevlerine proje bağlamı ekle', description: 'Her görev kendi projesini bağımsız olarak taşısın.', project: 'Developer Portal', provider: 'auto', points: 3, status: 'todo', priority: 'medium', createdAt: Date.now() - 1000 },
+    { id: crypto.randomUUID(), title: 'Proje seçim deneyimini tasarla', description: 'Kayıtlı repository’ler arasında hızlı geçiş.', project: 'Developer Portal', provider: 'auto', points: 3, status: 'todo', priority: 'low', createdAt: Date.now() - 2000 },
+    { id: crypto.randomUUID(), title: 'Local state kalıcılığını doğrula', description: 'Workflow durumunun tarayıcıda korunduğunu doğrula.', project: 'Developer Portal', provider: 'auto', points: 2, status: 'done', priority: 'high', createdAt: Date.now() - 3000 }
   ],
   activities: [
     { icon: '⌂', title: 'Developer portal çalışma alanı açıldı', detail: 'Bağımsız araçlar kullanıma hazır', at: 'şimdi' },
@@ -56,7 +56,7 @@ function loadState() {
       ...defaults,
       reviews: Number.isFinite(saved.reviews) ? saved.reviews : defaults.reviews,
       reviewProvider: typeof saved.reviewProvider === 'string' ? saved.reviewProvider : typeof saved.provider === 'string' ? saved.provider : defaults.reviewProvider,
-      coderProvider: typeof saved.coderProvider === 'string' ? saved.coderProvider : defaults.coderProvider,
+      workflowProvider: typeof saved.workflowProvider === 'string' ? saved.workflowProvider : typeof saved.coderProvider === 'string' ? saved.coderProvider : defaults.workflowProvider,
       tasks: saved.tasks.map(task => {
         const legacyUpdate = legacyTaskUpdates[task.title];
         const legacyProject = task.project === 'AI Reviewer';
@@ -64,7 +64,8 @@ function loadState() {
           ...task,
           ...(legacyUpdate || {}),
           project: legacyProject ? (seedTitles.has(task.title) ? 'Developer Portal' : 'Genel') : typeof task.project === 'string' && task.project.trim() ? task.project : 'Genel',
-          points: seedPoints[task.title] || ([2, 3, 5].includes(Number(task.points)) ? Number(task.points) : task.priority === 'high' ? 5 : task.priority === 'low' ? 2 : 3)
+          points: seedPoints[task.title] || ([2, 3, 5].includes(Number(task.points)) ? Number(task.points) : task.priority === 'high' ? 5 : task.priority === 'low' ? 2 : 3),
+          provider: typeof task.provider === 'string' ? task.provider : 'auto'
         };
       }),
       activities: Array.isArray(saved.activities) ? saved.activities : defaults.activities,
@@ -208,7 +209,7 @@ async function startWorkflowTask(task) {
     const response = await fetch(`/api/workflow/tasks/${encodeURIComponent(task.id)}/start`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...task, provider: state.coderProvider || 'auto' })
+      body: JSON.stringify({ ...task, provider: task.provider || state.workflowProvider || 'auto' })
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Workflow görevi başlatılamadı.');
@@ -238,7 +239,7 @@ function renderTasks() {
       const run = workflowRuns.get(task.id);
       const running = run?.status === 'running';
       const localError = task.workflowError && !['running', 'review'].includes(run?.status) ? `<div class="run-state failed"><b>Başlatılamadı</b><span>${escape(task.workflowError)}</span></div>` : '';
-      return `<article class="task-card${running ? ' is-running' : ''}${task.status === 'review' ? ' is-review' : ''}" draggable="${running ? 'false' : 'true'}" data-task-id="${escape(task.id)}"><div class="task-priority"><i class="priority-dot ${task.priority}"></i><button class="task-menu" type="button" data-delete-task="${escape(task.id)}" aria-label="Görevi sil" ${running ? 'disabled' : ''}>×</button></div><h3>${escape(task.title)}</h3>${task.description ? `<p>${escape(task.description)}</p>` : ''}<div class="task-footer"><span class="task-tag">${escape(task.project || 'Projesiz')}</span><button class="task-points points-${points}" type="button" data-plan-task="${escape(task.id)}" title="Coder ile planla: ${escape(profile.codex)}">${points} puan · ${escape(profile.label)}</button></div>${localError || workflowRunCard(task, run)}</article>`;
+      return `<article class="task-card${running ? ' is-running' : ''}${task.status === 'review' ? ' is-review' : ''}" draggable="${running ? 'false' : 'true'}" data-task-id="${escape(task.id)}"><div class="task-priority"><i class="priority-dot ${task.priority}"></i><button class="task-menu" type="button" data-delete-task="${escape(task.id)}" aria-label="Görevi sil" ${running ? 'disabled' : ''}>×</button></div><h3>${escape(task.title)}</h3>${task.description ? `<p>${escape(task.description)}</p>` : ''}<div class="task-footer"><span class="task-tag">${escape(task.project || 'Projesiz')}</span><span class="task-points points-${points}" title="${escape(profile.codex)} · ${escape(profile.claude)}">${points} puan · ${escape(profile.label)}</span></div>${localError || workflowRunCard(task, run)}</article>`;
     }).join('');
     return `<section class="kanban-column" data-status="${column.id}"><header class="column-head"><span>${column.label}</span><span class="column-count">${tasks.length}</span></header><div class="task-list">${cards}</div></section>`;
   }).join('');
@@ -266,18 +267,6 @@ function renderTasks() {
     await fetch(`/api/workflow/tasks/${encodeURIComponent(button.dataset.deleteTask)}`, { method: 'DELETE' }).catch(() => null);
     state.tasks = state.tasks.filter(task => task.id !== button.dataset.deleteTask);
     persistAndRender();
-  }));
-  $$('[data-plan-task]').forEach(button => button.addEventListener('click', () => {
-    const task = state.tasks.find(item => item.id === button.dataset.planTask);
-    if (!task) return;
-    const coderForm = $('#coder-form');
-    coderForm.elements.repository.value = task.project || '';
-    coderForm.elements.complexity.value = String(taskPoints(task.points));
-    coderForm.elements.prompt.value = [task.title, task.description].filter(Boolean).join('\n\n');
-    updateCoderModelRoute();
-    showView('workflow');
-    $('.coder-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    coderForm.elements.prompt.focus();
   }));
   $$('[data-feedback-form]').forEach(feedbackForm => feedbackForm.addEventListener('submit', async event => {
     event.preventDefault();
@@ -414,10 +403,14 @@ const taskForm = $('#task-form');
 function updateTaskModelHint() {
   const points = taskPoints(taskForm.elements.points.value);
   const profile = taskProfiles[points];
-  $('#task-model-hint').textContent = `Coder profili: ${profile.codex} · ${profile.claude}`;
+  const provider = taskForm.elements.provider.value;
+  const route = provider === 'codex' ? profile.codex : provider === 'claude' ? profile.claude : `${profile.codex} / ${profile.claude}`;
+  $('#task-model-hint').textContent = `Model profili: ${route}`;
 }
 $$('[data-open-task]').forEach(button => button.addEventListener('click', () => {
   $('#task-error').textContent = '';
+  const preferredProvider = state.workflowProvider || 'auto';
+  taskForm.elements.provider.value = [...taskForm.elements.provider.options].some(option => option.value === preferredProvider && !option.disabled) ? preferredProvider : 'auto';
   updateTaskModelHint();
   taskDialog.showModal();
 }));
@@ -427,10 +420,12 @@ taskForm.addEventListener('submit', async event => {
   event.preventDefault();
   const values = Object.fromEntries(new FormData(event.currentTarget));
   const points = taskPoints(values.points);
-  const task = { id: crypto.randomUUID(), title: values.title.trim(), description: values.description.trim(), project: values.project.trim(), points, status: values.status, priority: values.priority, createdAt: Date.now() };
+  const task = { id: crypto.randomUUID(), title: values.title.trim(), description: values.description.trim(), project: values.project.trim(), provider: values.provider || 'auto', points, status: values.status, priority: values.priority, createdAt: Date.now() };
+  state.workflowProvider = task.provider;
   state.tasks.unshift(task);
   addActivity('＋', values.title.trim(), `${values.project.trim()} · ${points} puanlık workflow görevi`);
   event.currentTarget.reset();
+  event.currentTarget.elements.provider.value = state.workflowProvider;
   updateTaskModelHint();
   taskDialog.close();
   persistAndRender();
@@ -457,45 +452,6 @@ window.addEventListener('keydown', event => {
   if (event.key === 'Escape') $('.sidebar').classList.remove('open');
 });
 
-function updateCoderModelRoute() {
-  const coderForm = $('#coder-form');
-  const points = taskPoints(coderForm.elements.complexity.value);
-  const profile = taskProfiles[points];
-  const provider = coderForm.elements.provider.value;
-  const route = provider === 'codex' ? profile.codex : provider === 'claude' ? profile.claude : `${profile.codex} / ${profile.claude}`;
-  $('#coder-model-route').textContent = `${points} puan · ${profile.label} profil · ${route}`;
-}
-
-$('#coder-form').addEventListener('submit', async event => {
-  event.preventDefault();
-  const button = event.currentTarget.querySelector('button[type="submit"]');
-  const coderStatus = $('#coder-status');
-  const coderResult = $('#coder-result');
-  const prompt = event.currentTarget.elements.prompt.value.trim();
-  const repositorySelection = event.currentTarget.elements.repository.value.trim();
-  const complexity = taskPoints(event.currentTarget.elements.complexity.value);
-  if (!prompt || !repositorySelection) return;
-  button.disabled = true;
-  coderStatus.textContent = 'Repository inceleniyor…';
-  coderResult.hidden = true;
-  try {
-    const response = await fetch('/api/code-plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt, repository: repositorySelection, complexity, provider: $('#coder-provider-select').value }) });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'Plan oluşturulamadı.');
-    coderResult.textContent = data.plan;
-    coderResult.hidden = false;
-    const providerName = data.provider === 'claude' ? 'Claude Code' : 'Codex';
-    coderStatus.textContent = `Plan hazır · ${providerName} · ${data.model} · ${complexity} puan`;
-    addActivity('◇', 'Coder planı oluşturuldu', `${repositorySelection} · ${complexity} puan · ${data.model}`);
-    addJournalEntry('Coder planı oluşturuldu', `${repositorySelection}: ${prompt}`, ['coder', 'plan', `${complexity}-puan`]);
-    persistAndRender();
-  } catch (error) {
-    coderResult.textContent = error.message;
-    coderResult.hidden = false;
-    coderStatus.textContent = 'Planlama tamamlanamadı';
-  } finally { button.disabled = false; }
-});
-
 const form = $('#review-form');
 const result = $('#result');
 const status = $('#status');
@@ -506,7 +462,7 @@ const commitOverview = $('#commit-overview');
 const diffInput = $('#diff-input');
 const diffPreview = $('#diff-preview');
 const providerInput = $('#provider-select');
-const coderProviderInput = $('#coder-provider-select');
+const taskProviderInput = $('#task-provider-select');
 const modelInput = form.elements.model;
 const effortInput = form.elements.reasoningEffort;
 const reviewProjectButton = $('#review-project-switcher');
@@ -687,10 +643,11 @@ async function checkProviders() {
     if (!response.ok || !data.connected) throw new Error();
     const options = '<option value="auto">Otomatik seçim</option>' + data.providers.map(provider => `<option value="${escape(provider.id)}" ${provider.available ? '' : 'disabled'}>${escape(provider.name)} · ${provider.available ? 'hazır' : provider.detail}</option>`).join('');
     providerInput.innerHTML = options;
-    coderProviderInput.innerHTML = options;
+    taskProviderInput.innerHTML = options;
     providerInput.value = data.providers.some(provider => provider.id === state.reviewProvider && provider.available) ? state.reviewProvider : 'auto';
-    coderProviderInput.value = data.providers.some(provider => provider.id === state.coderProvider && provider.available) ? state.coderProvider : 'auto';
-    updateCoderModelRoute();
+    taskProviderInput.value = data.providers.some(provider => provider.id === state.workflowProvider && provider.available) ? state.workflowProvider : 'auto';
+    state.workflowProvider = taskProviderInput.value;
+    updateTaskModelHint();
     const available = data.providers.filter(provider => provider.available).map(provider => provider.name);
     codexStatus.innerHTML = `<i></i>${escape(available.join(' · '))} hazır`;
   } catch { codexStatus.textContent = 'Yerel LLM oturumu gerekli'; }
@@ -702,12 +659,10 @@ modelInput.addEventListener('change', () => {
   if (maxOption.disabled && effortInput.value === 'max') effortInput.value = 'xhigh';
 });
 providerInput.addEventListener('change', () => { state.reviewProvider = providerInput.value; saveState(); });
-coderProviderInput.addEventListener('change', () => { state.coderProvider = coderProviderInput.value; saveState(); updateCoderModelRoute(); });
-$('#coder-complexity').addEventListener('change', updateCoderModelRoute);
+taskProviderInput.addEventListener('change', () => { state.workflowProvider = taskProviderInput.value; saveState(); updateTaskModelHint(); });
 
 setReviewEnabled(false);
 updateTaskModelHint();
-updateCoderModelRoute();
 showView(location.hash.slice(1) || 'dashboard', false);
 persistAndRender();
 checkProviders();

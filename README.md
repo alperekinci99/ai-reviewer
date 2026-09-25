@@ -1,6 +1,6 @@
 # Orbit — Developer Cockpit
 
-Yerel geliştirme akışını birden fazla proje bağlamında birleştiren kişisel developer paneli. İlk sürüm; ana dashboard, agent çalıştırabilen proje bazlı sürükle-bırak workflow, repository'yi salt-okunur inceleyen Coder Session, günlük çalışma hafızası ve mevcut AI code review aracını içerir.
+Yerel geliştirme akışını birden fazla proje bağlamında birleştiren kişisel developer paneli. İlk sürüm; ana dashboard, agent çalıştırabilen proje bazlı sürükle-bırak workflow, günlük çalışma hafızası ve mevcut AI code review aracını içerir.
 
 Workflow ve journal verileri tarayıcıda yerel olarak saklanır. AI modülleri kullanıcının bilgisayarında kurulu ve oturumu açık olan Codex veya Claude Code CLI üzerinden çalışır. Uygulama API anahtarı istemez, okumaz ve saklamaz. Diff, değişiklik metadatası, ilgili README ve isteğe bağlı inceleme notu seçilen yerel araca iletilir; review sonucu önceden tanımlı JSON şemasına göre doğrulanır.
 
@@ -14,23 +14,23 @@ npm run dev
 
 Ardından `http://localhost:3000` adresini açın. AI Review ekranındaki proje seçiciden repository yolunu yazın veya `Finder’dan seç` ile repository klasörünü seçin; ardından inceleme türünü ve commit/PR hedefini girin. Bir proje seçilene kadar review alanları kilitli kalır.
 
-AI çalışmaları seçilen yerel aracın hesabındaki kullanım kotasından harcanır. AI Review ve Coder Session salt-okunur/plan modunda çalışır. Workflow executor ise yalnızca seçilen repository için yazma izniyle çalışır; commit, push veya dış sisteme yazma yapmaz.
+AI çalışmaları seçilen yerel aracın hesabındaki kullanım kotasından harcanır. AI Review salt-okunur modda çalışır. Workflow executor ise yalnızca seçilen repository için yazma izniyle çalışır; commit, push veya dış sisteme yazma yapmaz.
 
 ## Agent kuralları ve yerel sağlayıcılar
 
-Her AI modülünün davranış sözleşmesi `agents/` klasöründe ayrı tutulur: `reviewer.md`, `coder.md`, `workflow.md` ve gerçek kod değişikliğini yapan `executor.md`. Kurallar modülün amacını, izinlerini, kapsamını ve çıktı sözleşmesini tanımlar; model sağlayıcısından bağımsızdır.
+Her AI modülünün davranış sözleşmesi `agents/` klasöründe ayrı tutulur: `reviewer.md`, `workflow.md` ve gerçek kod değişikliğini yapan `executor.md`. Kurallar modülün amacını, izinlerini, kapsamını ve çıktı sözleşmesini tanımlar; model sağlayıcısından bağımsızdır.
 
 Ortak sağlayıcı katmanı başlangıçta Codex ve Claude Code CLI araçlarını otomatik keşfeder. Arayüzden `Otomatik seçim`, `Codex` veya `Claude Code` seçilebilir. Otomatik seçim yalnızca kullanılabilir yerel araçlardan birini kullanır; uygulama içerisinde API token alanı veya secret saklama mekanizması bulunmaz.
 
 ### Workflow iş puanı ve model profili
 
-Workflow görevleri kapsam için `2`, `3` veya `5` puan alır. Öncelik iş sırasını, puan ise Coder Session model profilini belirler:
+Workflow görevleri kapsam için `2`, `3` veya `5` puan alır. Öncelik iş sırasını, puan ise workflow agent model profilini belirler:
 
 - `2`: küçük ve net işler — Codex için `gpt-5.6-luna` + `low`, Claude Code için `haiku`.
 - `3`: orta kapsamlı işler — Codex için `gpt-5.6-terra` + `medium`, Claude Code için `sonnet`.
 - `5`: çok adımlı veya riskli işler — Codex için `gpt-5.6-sol` + `high`, Claude Code için `opus`.
 
-Görev kartındaki puan düğmesi görevi Coder Session'a proje, açıklama ve puanıyla aktarır. Bu yönlendirme kesin bir token üst sınırı değildir; model kapasitesi ve reasoning seviyesi üzerinden kullanım/kalite dengesini yönetir. AI Review modeli ve çaba ayarı bu puanlardan bağımsız kalır.
+Yeni görev formunda yerel LLM aracı seçilebilir. Puan yönlendirmesi kesin bir token üst sınırı değildir; model kapasitesi ve reasoning seviyesi üzerinden kullanım/kalite dengesini yönetir. AI Review modeli ve çaba ayarı bu puanlardan bağımsız kalır.
 
 ### Otomatik workflow çalışması ve review döngüsü
 
@@ -48,15 +48,15 @@ Codex Desktop’ın varsayılan macOS yolu otomatik algılanır. Farklı bir Cod
 
 ## Repository seçimi
 
-Review repository seçimi tamamen AI Review ekranından yapılır. Yol elle yazılabilir, kayıtlı proje kısayolu kullanılabilir veya macOS Finder üzerinden klasör seçilebilir. `commit` seçildiğinde commit alanı boş bırakılırsa `HEAD` kullanılır. `pr` seçildiğinde GitHub veya Azure DevOps pull request URL’sini ya da yalnızca PR numarasını girin. Workflow görevleri ve Coder Session kendi proje seçimine ve Finder butonuna sahiptir; bu nedenle aynı panoda farklı repository'lere ait işler tutulabilir.
+Review repository seçimi tamamen AI Review ekranından yapılır. Yol elle yazılabilir, kayıtlı proje kısayolu kullanılabilir veya macOS Finder üzerinden klasör seçilebilir. `commit` seçildiğinde commit alanı boş bırakılırsa `HEAD` kullanılır. `pr` seçildiğinde GitHub veya Azure DevOps pull request URL’sini ya da yalnızca PR numarasını girin. Workflow görevleri kendi proje seçimine ve Finder butonuna sahiptir; bu nedenle aynı panoda farklı repository'lere ait işler tutulabilir.
 
-AI Review ve Workflow bağımsız modüllerdir. Review’de seçilen repository, sağlayıcı veya tamamlanan inceleme Workflow görevlerini oluşturmaz ya da değiştirmez. Her Workflow görevinin proje bilgisi yalnızca görev oluşturulurken verilen değerden gelir; Coder Session da kendi repository ve yerel LLM seçimini kullanır.
+AI Review ve Workflow bağımsız modüllerdir. Review’de seçilen repository, sağlayıcı veya tamamlanan inceleme Workflow görevlerini oluşturmaz ya da değiştirmez. Her Workflow görevinin proje ve yerel LLM seçimi yalnızca görev oluşturulurken verilen değerden gelir.
 
 Eski terminal akışı geriye dönük uyumluluk için `npm run review` komutuyla kullanılmaya devam edebilir, ancak normal kullanımda gerekli değildir.
 
 ### Kayıtlı projeler
 
-Finder’dan seçilen Git repository'leri otomatik olarak kullanıcıya özel yerel proje listesine kaydedilir. Elle yazılmış bir yolu kaydetmek için ilgili formdaki `Mevcut yolu kaydet` düğmesini kullanın. Kayıtlı projeler Review, Coder Session ve Workflow görev formlarında tıklanabilir bir liste olarak gösterilir; Finder’da tekrar klasör aramak gerekmez.
+Finder’dan seçilen Git repository'leri otomatik olarak kullanıcıya özel yerel proje listesine kaydedilir. Elle yazılmış bir yolu kaydetmek için ilgili formdaki `Mevcut yolu kaydet` düğmesini kullanın. Kayıtlı projeler Review ve Workflow görev formlarında tıklanabilir bir liste olarak gösterilir; Finder’da tekrar klasör aramak gerekmez.
 
 Repository klasör adından kısa bir kısayol otomatik üretilir. Aynı adlı farklı repository'ler için `-2`, `-3` gibi güvenli ekler kullanılır. Terminalden ekleme ve silme yapmak isteyenler için `npm run projects` komutu kullanılmaya devam edebilir.
 

@@ -177,8 +177,7 @@ button,input,textarea,select{font:inherit}
 .task-card p{font-size:10px;line-height:1.55;color:#7e8480;margin:0}
 .task-footer{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:15px;font:9px var(--mono);color:#999e9b}
 .task-tag{max-width:145px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:4px 6px;border-radius:3px;background:#eef2e9;color:#5c745d}
-.task-points{flex:none;border:1px solid #dfe3dc;border-radius:4px;background:#f7f8f5;color:#69706c;padding:4px 6px;font:8px var(--mono);cursor:pointer}
-.task-points:hover{border-color:#9eae98;background:#eef3e9;color:#3f5945}
+.task-points{flex:none;border:1px solid #dfe3dc;border-radius:4px;background:#f7f8f5;color:#69706c;padding:4px 6px;font:8px var(--mono)}
 .task-points.points-2{color:#567762}
 .task-points.points-3{color:#98703d}
 .task-points.points-5{border-color:#ead1cc;color:#a55043;background:#fff6f4}
@@ -246,7 +245,7 @@ dialog form{padding:27px}
 .dialog-head h2{font-size:20px;margin:5px 0 0}
 .dialog-close{border:0;background:#f1f2ee;border-radius:50%;width:31px;height:31px;cursor:pointer;font-size:18px}
 .dialog-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.task-settings-grid{grid-template-columns:repeat(3,1fr)}
+.task-settings-grid{grid-template-columns:repeat(2,1fr)}
 .dialog-actions{justify-content:flex-end;gap:8px;margin-top:24px}
 
 @media(max-width:1100px){.dashboard-grid{grid-template-columns:1.3fr 1fr}
@@ -294,25 +293,6 @@ dialog form{padding:27px}
 .review-main>#diff-input:not([hidden]){display:block;width:calc(100% - 44px);min-height:110px;margin:20px 22px 0;padding:12px;border:1px dashed #cfd4cb;border-radius:7px;background:#f8faf6;color:#39403c;font:10px/1.6 var(--mono);resize:vertical;outline:none}
 .review-main>#diff-input:not([hidden]):focus{border-color:#8ba770;box-shadow:0 0 0 3px #b9f36b2b}
 
-.coder-panel{display:grid;grid-template-columns:minmax(220px,.7fr) minmax(320px,1.3fr);gap:28px;padding:26px;margin-bottom:18px;border-radius:10px;background:#13171a;color:#fff}
-.coder-copy h2{font-size:20px;letter-spacing:-.7px;margin:14px 0 8px}
-.coder-copy p{max-width:390px;margin:0;color:#8f9792;font-size:11px;line-height:1.6}
-.coder-panel label{display:block;font-size:10px;color:#9ba39e}
-.coder-panel form>label:not(:first-child){margin-top:13px}
-.coder-panel input,.coder-panel select,.coder-panel textarea{display:block;width:100%;margin-top:7px;padding:11px;border:1px solid #343a3c;border-radius:6px;background:#1b2023;color:#fff;font:11px/1.6 var(--mono);resize:vertical;outline:none}
-.coder-panel input:focus,.coder-panel select:focus,.coder-panel textarea:focus{border-color:#7c9c65;box-shadow:0 0 0 3px #b9f36b16}
-.model-route{margin-top:7px;padding:8px 10px;border:1px solid #2f3934;border-radius:5px;background:#171c1e;color:#91a18f;font:8px/1.5 var(--mono)}
-.coder-actions{display:flex;justify-content:space-between;align-items:center;margin-top:10px}
-.coder-actions>span{font-size:9px;color:#737c77}
-.coder-actions button{border:0;border-radius:5px;background:var(--lime);color:#162014;padding:10px 13px;font-size:10px;font-weight:700;cursor:pointer}
-.coder-actions button span{margin-left:8px}
-.coder-actions button:disabled{opacity:.55;cursor:wait}
-.coder-result{grid-column:1/-1;border-top:1px solid #2a3032;padding-top:20px;color:#c3cac6;font-size:11px;line-height:1.75;white-space:pre-wrap}
-
-@media(max-width:760px){.coder-panel{grid-template-columns:1fr;padding:22px}
-.coder-result{grid-column:auto}
-}
-
 .kanban{grid-template-columns:minmax(200px,.85fr) minmax(200px,.85fr) minmax(350px,1.45fr) minmax(200px,.85fr)}
 
 @media(max-width:760px){.kanban{grid-template-columns:repeat(4,270px)}
@@ -323,11 +303,9 @@ dialog form{padding:27px}
 .project-dialog label small{display:block;margin-top:6px;color:#969b98;font-size:9px;font-weight:400}
 .field-hint{display:block;margin-top:6px;color:#969b98;font-size:9px;font-weight:400}
 .path-picker{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:stretch;margin-top:7px}
-.path-picker input,.coder-panel .path-picker input{margin-top:0;min-width:0}
+.path-picker input{margin-top:0;min-width:0}
 .path-picker-button{border:1px solid #d9ddd6;border-radius:6px;background:#f2f4ef;color:#4f5852;padding:0 12px;font-size:10px;font-weight:700;white-space:nowrap;cursor:pointer}
 .path-picker-button:hover{border-color:#aeb7aa;background:#e9ede6}
-.coder-panel .path-picker-button{border-color:#3b4340;background:#252b2d;color:#c4ccc7}
-.coder-panel .path-picker-button:hover{border-color:#75816f;background:#2d3432}
 .saved-project-picker{margin-top:12px}
 .saved-project-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .saved-project-head>span{font:500 8px var(--mono);letter-spacing:1px;color:#929995}
@@ -339,12 +317,6 @@ dialog form{padding:27px}
 .saved-project-list b{overflow:hidden;text-overflow:ellipsis;font-size:10px}
 .saved-project-list small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#959b97;font:8px var(--mono)}
 .saved-project-empty{padding:9px 10px;border:1px dashed #dfe3dc;border-radius:6px;color:#999f9b;font-size:9px}
-.coder-panel .saved-project-head>span{color:#68716d}
-.coder-panel .saved-project-head>button{color:#9baa9f}
-.coder-panel .saved-project-head>button:hover{color:var(--lime)}
-.coder-panel .saved-project-list>button{border-color:#303739;background:#1b2023;color:#d9dfdb}
-.coder-panel .saved-project-list>button:hover{border-color:#66745f;background:#222927}
-.coder-panel .saved-project-empty{border-color:#303739;color:#68716d}
 .dialog-error{min-height:18px;margin-top:12px;color:#aa4d40;font-size:10px}
 .dialog-error.success{color:#567762}
 .project-dialog button:disabled{opacity:.6;cursor:wait}
