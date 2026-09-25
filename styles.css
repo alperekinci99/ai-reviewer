@@ -167,11 +167,7 @@ button,input,textarea,select{font:inherit}
 .task-card.is-running{cursor:progress;border-color:#b8cca9;box-shadow:0 0 0 3px #b9f36b17}
 .task-card.is-review{cursor:grab}
 .kanban-column.dragover{outline:2px solid #98bc72;outline-offset:-2px}
-.task-priority{display:flex;justify-content:space-between;align-items:center}
-.priority-dot{width:6px;height:6px;border-radius:50%}
-.priority-dot.high{background:#d96856}
-.priority-dot.medium{background:#d69b4d}
-.priority-dot.low{background:#7c9c7b}
+.task-card-actions{display:flex;justify-content:flex-end;align-items:center}
 .task-menu{border:0;background:transparent;color:#969b98;cursor:pointer}
 .task-card h3{font-size:12px;line-height:1.4;margin:12px 0 6px}
 .task-card p{font-size:10px;line-height:1.55;color:#7e8480;margin:0}
@@ -245,7 +241,6 @@ dialog form{padding:27px}
 .dialog-head h2{font-size:20px;margin:5px 0 0}
 .dialog-close{border:0;background:#f1f2ee;border-radius:50%;width:31px;height:31px;cursor:pointer;font-size:18px}
 .dialog-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.task-settings-grid{grid-template-columns:repeat(2,1fr)}
 .dialog-actions{justify-content:flex-end;gap:8px;margin-top:24px}
 .workflow-diff-dialog{width:min(1000px,calc(100% - 28px))}
 .workflow-diff-dialog form{display:flex;flex-direction:column;max-height:min(780px,calc(100vh - 48px))}
@@ -328,7 +323,6 @@ dialog form{padding:27px}
 
 @media(max-width:480px){.path-picker{grid-template-columns:1fr}
 .path-picker-button{min-height:38px}
-.task-settings-grid{grid-template-columns:1fr}
 }
 
 .review-controls label>span{color:#9aa09c;font-size:9px;font-weight:400}

@@ -24,13 +24,13 @@ Ortak sağlayıcı katmanı başlangıçta Codex ve Claude Code CLI araçların�
 
 ### Workflow iş puanı ve model profili
 
-Workflow görevleri kapsam için `2`, `3` veya `5` puan alır. Öncelik iş sırasını, puan ise workflow agent model profilini belirler:
+Workflow görevleri kapsam için `2`, `3` veya `5` puan alır. Puan, workflow agent model profilini belirler:
 
 - `2`: küçük ve net işler — Codex için `gpt-5.6-luna` + `low`, Claude Code için `haiku`.
 - `3`: orta kapsamlı işler — Codex için `gpt-5.6-terra` + `medium`, Claude Code için `sonnet`.
 - `5`: çok adımlı veya riskli işler — Codex için `gpt-5.6-sol` + `high`, Claude Code için `opus`.
 
-Yeni görev formunda yerel LLM aracı seçilebilir. Puan yönlendirmesi kesin bir token üst sınırı değildir; model kapasitesi ve reasoning seviyesi üzerinden kullanım/kalite dengesini yönetir. AI Review modeli ve çaba ayarı bu puanlardan bağımsız kalır.
+Yeni görevler otomatik olarak `Yapılacak` durumunda oluşturulur ve kullanılabilir yerel LLM aracı otomatik seçilir. Puan yönlendirmesi kesin bir token üst sınırı değildir; model kapasitesi ve reasoning seviyesi üzerinden kullanım/kalite dengesini yönetir. AI Review modeli ve çaba ayarı bu puanlardan bağımsız kalır.
 
 ### Otomatik workflow çalışması ve review döngüsü
 
