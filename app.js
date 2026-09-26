@@ -181,17 +181,17 @@ $$('[data-save-project]').forEach(button => button.addEventListener('click', asy
 }));
 
 const columns = [
-  { id: 'todo', label: 'YAPILACAK' },
-  { id: 'doing', label: 'YAPILIYOR' },
+  { id: 'todo', label: 'TO DO' },
+  { id: 'doing', label: 'IN PROGRESS' },
   { id: 'review', label: 'REVIEW' },
-  { id: 'done', label: 'TAMAMLANDI' }
+  { id: 'done', label: 'DONE' }
 ];
 
 const workflowProviderLabel = provider => provider === 'claude' ? 'Claude Code' : provider === 'codex' ? 'Codex' : 'Yerel agent';
 
 function workflowRunCard(task, run) {
   if (task.workflowStarting) return '<div class="run-state running"><i></i><span><b>Agent başlatılıyor</b><small>Provider ve model hazırlandıktan sonra çalışma başlayacak.</small></span></div>';
-  if (!run && task.status === 'doing') return '<div class="run-state idle">Hazır · yeniden tetiklemek için başka bir kolona, ardından Yapılıyor’a taşı.</div>';
+  if (!run && task.status === 'doing') return '<div class="run-state idle">Hazır · yeniden tetiklemek için başka bir kolona, ardından In Progress’e taşı.</div>';
   if (!run) return '';
   const provider = workflowProviderLabel(run.provider);
   if (run.status === 'running') return `<div class="run-state running"><i></i><span><b>${escape(provider)} çalışıyor</b><small>${escape(run.model || 'varsayılan model')} · ${run.attempt || 1}. tur</small></span></div>`;
@@ -279,7 +279,8 @@ function renderTasks() {
       const projectControl = task.azureBoards && !task.project
         ? `<select class="task-project-select" data-task-project-select="${escape(task.id)}" aria-label="Repository seç"><option value="">Repository seç…</option>${savedProjects.map(project => `<option value="${escape(project.name)}">${escape(project.name)}</option>`).join('')}</select>`
         : `<span class="task-tag">${escape(task.project || 'Projesiz')}</span>`;
-      return `<article class="task-card${running ? ' is-running' : ''}${task.status === 'review' ? ' is-review' : ''}" draggable="${running ? 'false' : 'true'}" data-task-id="${escape(task.id)}"><div class="task-card-actions"><button class="task-menu" type="button" data-delete-task="${escape(task.id)}" aria-label="Görevi sil" ${running ? 'disabled' : ''}>×</button></div><h3>${escape(task.title)}</h3>${task.description ? `<p>${escape(task.description)}</p>` : ''}<div class="task-footer">${projectControl}<span class="task-points points-${points}" title="${escape(profile.codex)} · ${escape(profile.claude)}">${points} puan · ${escape(profile.label)}</span></div>${azureLink}${attachmentBadge}${localError || workflowRunCard(task, run)}</article>`;
+      const editAction = task.status === 'todo' ? `<button class="task-edit" type="button" data-edit-task="${escape(task.id)}" aria-label="Görevi düzenle" title="Görevi düzenle">Düzenle</button>` : '';
+      return `<article class="task-card${running ? ' is-running' : ''}${task.status === 'review' ? ' is-review' : ''}" draggable="${running ? 'false' : 'true'}" data-task-id="${escape(task.id)}"><div class="task-card-actions">${editAction}<button class="task-menu" type="button" data-delete-task="${escape(task.id)}" aria-label="Görevi sil" ${running ? 'disabled' : ''}>×</button></div><h3>${escape(task.title)}</h3>${task.description ? `<p>${escape(task.description)}</p>` : ''}<div class="task-footer">${projectControl}<span class="task-points points-${points}" title="${escape(profile.codex)} · ${escape(profile.claude)}">${points} puan · ${escape(profile.label)}</span></div>${azureLink}${attachmentBadge}${localError || workflowRunCard(task, run)}</article>`;
     }).join('');
     return `<section class="kanban-column" data-status="${column.id}"><header class="column-head"><span>${column.label}</span><span class="column-count">${tasks.length}</span></header><div class="task-list">${cards}</div></section>`;
   }).join('');
@@ -313,6 +314,11 @@ function renderTasks() {
     await fetch(`/api/workflow/tasks/${encodeURIComponent(button.dataset.deleteTask)}`, { method: 'DELETE' }).catch(() => null);
     state.tasks = state.tasks.filter(task => task.id !== button.dataset.deleteTask);
     persistAndRender();
+  }));
+  $$('[data-edit-task]').forEach(button => button.addEventListener('click', event => {
+    event.stopPropagation();
+    const task = state.tasks.find(item => item.id === button.dataset.editTask && item.status === 'todo');
+    if (task) openTaskDialog(task);
   }));
   $$('[data-task-project-select]').forEach(select => select.addEventListener('change', event => {
     const task = state.tasks.find(item => item.id === event.currentTarget.dataset.taskProjectSelect);
@@ -475,12 +481,21 @@ const azureBoardsForm = $('#azure-boards-form');
 const taskImagesInput = $('#task-images');
 const taskImageTypes = new Set(['image/png', 'image/jpeg', 'image/webp']);
 let selectedTaskImages = [];
+let retainedTaskAttachments = [];
 let taskImagePreviewUrls = [];
+let editingTaskId = null;
 
 function renderTaskImagePreviews() {
   taskImagePreviewUrls.forEach(URL.revokeObjectURL);
   taskImagePreviewUrls = selectedTaskImages.map(file => URL.createObjectURL(file));
-  $('#task-image-preview').innerHTML = selectedTaskImages.map((file, index) => `<div class="task-image-item"><img src="${taskImagePreviewUrls[index]}" alt="${escape(file.name)}" /><span>${escape(file.name)}</span><button type="button" data-remove-task-image="${index}" aria-label="${escape(file.name)} görselini kaldır">×</button></div>`).join('');
+  const task = editingTaskId ? { id: editingTaskId } : null;
+  const retainedItems = retainedTaskAttachments.map(attachment => `<div class="task-image-item"><img src="${escape(taskAttachmentUrl(task, attachment))}" alt="${escape(attachment.name)}" /><span>${escape(attachment.name)}</span><button type="button" data-remove-retained-image="${escape(attachment.id)}" aria-label="${escape(attachment.name)} görselini kaldır">×</button></div>`).join('');
+  const newItems = selectedTaskImages.map((file, index) => `<div class="task-image-item is-new"><img src="${taskImagePreviewUrls[index]}" alt="${escape(file.name)}" /><span>${escape(file.name)}</span><button type="button" data-remove-task-image="${index}" aria-label="${escape(file.name)} görselini kaldır">×</button></div>`).join('');
+  $('#task-image-preview').innerHTML = retainedItems + newItems;
+  $$('[data-remove-retained-image]').forEach(button => button.addEventListener('click', () => {
+    retainedTaskAttachments = retainedTaskAttachments.filter(attachment => attachment.id !== button.dataset.removeRetainedImage);
+    renderTaskImagePreviews();
+  }));
   $$('[data-remove-task-image]').forEach(button => button.addEventListener('click', () => {
     selectedTaskImages.splice(Number(button.dataset.removeTaskImage), 1);
     renderTaskImagePreviews();
@@ -489,6 +504,7 @@ function renderTaskImagePreviews() {
 
 function resetTaskImages() {
   selectedTaskImages = [];
+  retainedTaskAttachments = [];
   taskImagesInput.value = '';
   renderTaskImagePreviews();
 }
@@ -502,14 +518,16 @@ function fileDataUrl(file) {
   });
 }
 
-async function uploadTaskImages(taskId) {
-  if (!selectedTaskImages.length) return [];
+async function persistTaskImages(taskId, isEditing) {
+  if (!isEditing && !selectedTaskImages.length) return [];
   const images = await Promise.all(selectedTaskImages.map(async file => ({ name: file.name, type: file.type, data: await fileDataUrl(file) })));
   const response = await fetch(`/api/workflow/tasks/${encodeURIComponent(taskId)}/assets`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ images })
+    method: isEditing ? 'PUT' : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(isEditing ? { keepIds: retainedTaskAttachments.map(attachment => attachment.id), images } : { images })
   });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'Görev görselleri kaydedilemedi.');
+  if (!response.ok) throw new Error(data.error || `Görev görselleri ${isEditing ? 'güncellenemedi' : 'kaydedilemedi'}.`);
   return data.attachments || [];
 }
 
@@ -519,13 +537,29 @@ function updateTaskModelHint() {
   const route = automaticWorkflowProvider === 'codex' ? profile.codex : automaticWorkflowProvider === 'claude' ? profile.claude : `${profile.codex} / ${profile.claude}`;
   $('#task-model-hint').textContent = `Otomatik agent · ${route}`;
 }
-$$('[data-open-task]').forEach(button => button.addEventListener('click', () => {
+
+function openTaskDialog(task = null) {
   taskForm.reset();
+  editingTaskId = task?.id || null;
   resetTaskImages();
+  retainedTaskAttachments = task?.attachments ? [...task.attachments] : [];
+  if (task) {
+    taskForm.elements.title.value = task.title;
+    taskForm.elements.project.value = task.project || '';
+    taskForm.elements.points.value = String(taskPoints(task.points));
+    taskForm.elements.description.value = task.description || '';
+  }
+  taskForm.elements.project.required = !task?.azureBoards;
+  $('#task-dialog-kicker').textContent = task ? 'GÖREVİ DÜZENLE' : 'YENİ GÖREV';
+  $('#task-dialog-title').textContent = task ? 'Detayları güncelle' : 'Odağı tanımla';
+  $('#task-submit').textContent = task ? 'Değişiklikleri kaydet' : 'Görevi ekle';
   $('#task-error').textContent = '';
   updateTaskModelHint();
+  renderTaskImagePreviews();
   taskDialog.showModal();
-}));
+}
+
+$$('[data-open-task]').forEach(button => button.addEventListener('click', () => openTaskDialog()));
 taskForm.elements.points.addEventListener('change', updateTaskModelHint);
 taskImagesInput.addEventListener('change', event => {
   const files = [...event.currentTarget.files];
@@ -534,15 +568,18 @@ taskImagesInput.addEventListener('change', event => {
   const oversized = files.find(file => file.size > 5 * 1024 * 1024);
   if (invalidType) return void ($('#task-error').textContent = 'Yalnızca PNG, JPEG veya WEBP görselleri eklenebilir.');
   if (oversized) return void ($('#task-error').textContent = `${oversized.name} 5 MB sınırını aşıyor.`);
-  if (selectedTaskImages.length + files.length > 5) return void ($('#task-error').textContent = 'Bir göreve en fazla 5 görsel eklenebilir.');
-  if ([...selectedTaskImages, ...files].reduce((total, file) => total + file.size, 0) > 20 * 1024 * 1024) return void ($('#task-error').textContent = 'Görev görsellerinin toplam boyutu en fazla 20 MB olabilir.');
+  if (retainedTaskAttachments.length + selectedTaskImages.length + files.length > 5) return void ($('#task-error').textContent = 'Bir göreve en fazla 5 görsel eklenebilir.');
+  const retainedBytes = retainedTaskAttachments.reduce((total, attachment) => total + Number(attachment.size || 0), 0);
+  if (retainedBytes + [...selectedTaskImages, ...files].reduce((total, file) => total + file.size, 0) > 20 * 1024 * 1024) return void ($('#task-error').textContent = 'Görev görsellerinin toplam boyutu en fazla 20 MB olabilir.');
   selectedTaskImages.push(...files);
   $('#task-error').textContent = '';
   renderTaskImagePreviews();
 });
 taskDialog.addEventListener('close', () => {
   taskForm.reset();
+  editingTaskId = null;
   resetTaskImages();
+  taskForm.elements.project.required = true;
   updateTaskModelHint();
 });
 taskForm.addEventListener('submit', async event => {
@@ -551,15 +588,23 @@ taskForm.addEventListener('submit', async event => {
   const button = event.submitter || taskForm.querySelector('.primary-button');
   const values = Object.fromEntries(new FormData(event.currentTarget));
   const points = taskPoints(values.points);
-  const id = crypto.randomUUID();
+  const editingTask = editingTaskId ? state.tasks.find(task => task.id === editingTaskId && task.status === 'todo') : null;
+  if (editingTaskId && !editingTask) return void ($('#task-error').textContent = 'Yalnızca To Do görevleri düzenlenebilir.');
+  const id = editingTask?.id || crypto.randomUUID();
   button.disabled = true;
-  button.textContent = selectedTaskImages.length ? 'Görseller kaydediliyor…' : 'Görev ekleniyor…';
+  button.textContent = selectedTaskImages.length ? 'Görseller kaydediliyor…' : editingTask ? 'Güncelleniyor…' : 'Görev ekleniyor…';
   $('#task-error').textContent = '';
   try {
-    const attachments = await uploadTaskImages(id);
-    const task = { id, title: values.title.trim(), description: values.description.trim(), project: values.project.trim(), points, attachments, status: 'todo', createdAt: Date.now() };
-    state.tasks.unshift(task);
-    addActivity('＋', values.title.trim(), `${values.project.trim()} · ${points} puanlık workflow görevi`);
+    const attachments = await persistTaskImages(id, Boolean(editingTask));
+    if (editingTask) {
+      Object.assign(editingTask, { title: values.title.trim(), description: values.description.trim(), project: values.project.trim(), points, attachments });
+      delete editingTask.workflowError;
+      addActivity('✎', `${editingTask.title} güncellendi`, `${editingTask.project || 'Repository bekliyor'} · ${points} puan`);
+    } else {
+      const task = { id, title: values.title.trim(), description: values.description.trim(), project: values.project.trim(), points, attachments, status: 'todo', createdAt: Date.now() };
+      state.tasks.unshift(task);
+      addActivity('＋', values.title.trim(), `${values.project.trim()} · ${points} puanlık workflow görevi`);
+    }
     taskDialog.close();
     persistAndRender();
     showView('workflow');
@@ -567,7 +612,7 @@ taskForm.addEventListener('submit', async event => {
     $('#task-error').textContent = error.message;
   } finally {
     button.disabled = false;
-    button.textContent = 'Görevi ekle';
+    button.textContent = editingTask ? 'Değişiklikleri kaydet' : 'Görevi ekle';
   }
 });
 
@@ -606,7 +651,7 @@ azureBoardsForm.addEventListener('submit', async event => {
       imported.push(item);
     }
     addActivity('↓', 'Azure Boards işleri içe aktarıldı', `${imported.length} yeni iş${skipped ? ` · ${skipped} zaten panoda` : ''}`);
-    if (imported.length) addJournalEntry('Azure Boards senkronizasyonu', `${data.project} projesinden ${imported.length} iş Yapılacak kolonuna eklendi.`, ['azure-boards', 'workflow']);
+    if (imported.length) addJournalEntry('Azure Boards senkronizasyonu', `${data.project} projesinden ${imported.length} iş To Do kolonuna eklendi.`, ['azure-boards', 'workflow']);
     persistAndRender();
     azureBoardsDialog.close();
   } catch (error) { errorBox.textContent = error.message; }

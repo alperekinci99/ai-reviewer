@@ -12,7 +12,7 @@ import { providerStatuses, resolveLocalAgent, runLocalAgent } from './llm-provid
 import { taskProfile } from './task-routing.mjs';
 import { loadWorkflowRuns, recoverInterruptedRuns, saveWorkflowRuns } from './workflow-runs.mjs';
 import { azureBoardsWiql, azureOrganizationUrl, normalizeAzureBoardItems } from './azure-boards.mjs';
-import { deleteTaskImages, readTaskImage, resolveTaskImages, saveTaskImages } from './task-assets.mjs';
+import { deleteTaskImages, readTaskImage, resolveTaskImages, saveTaskImages, updateTaskImages } from './task-assets.mjs';
 
 const root = new URL('.', import.meta.url).pathname;
 const port = Number(process.env.PORT || 3000);
@@ -330,7 +330,7 @@ async function startWorkflowTask(id, input) {
   if (competingRun) throw new Error('Bu repository üzerinde başka bir workflow görevi çalışıyor.');
   if (!existing?.sessionId) {
     const dirty = (await gitAt(repositoryPath, ['status', '--porcelain'])).trim();
-    if (dirty) throw new Error('Repository’de kaydedilmemiş değişiklikler var. Mevcut çalışmanı commit/stash yaptıktan sonra görevi yeniden Yapılıyor’a taşı; böylece agent yalnızca kendi değişiklikleri üzerinde çalışır.');
+    if (dirty) throw new Error('Repository’de kaydedilmemiş değişiklikler var. Mevcut çalışmanı commit/stash yaptıktan sonra görevi yeniden In Progress’e taşı; böylece agent yalnızca kendi değişiklikleri üzerinde çalışır.');
   }
   const isResume = Boolean(existing?.sessionId);
   const agentSelection = await resolveLocalAgent(isResume
@@ -458,6 +458,16 @@ createServer(async (req, res) => {
       return send(res, 201, { attachments });
     } catch (error) {
       return send(res, 400, { error: error.message || 'Görev görselleri kaydedilemedi.' });
+    }
+  }
+  if (req.method === 'PUT' && workflowAssetsMatch) {
+    try {
+      const id = decodeURIComponent(workflowAssetsMatch[1]);
+      const input = await readJson(req, 30_000_000);
+      const attachments = await updateTaskImages(id, { keepIds: input.keepIds, images: input.images });
+      return send(res, 200, { attachments });
+    } catch (error) {
+      return send(res, 400, { error: error.message || 'Görev görselleri güncellenemedi.' });
     }
   }
   const workflowAssetMatch = req.url?.match(/^\/api\/workflow\/tasks\/([^/]+)\/assets\/([^/]+)$/);

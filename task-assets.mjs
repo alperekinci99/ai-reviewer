@@ -69,6 +69,13 @@ async function loadMetadata(taskId) {
   }
 }
 
+async function writeMetadata(taskId, attachments) {
+  const file = metadataFile(taskId);
+  const temporaryFile = `${file}.tmp`;
+  await writeFile(temporaryFile, `${JSON.stringify({ attachments }, null, 2)}\n`, 'utf8');
+  await rename(temporaryFile, file);
+}
+
 function publicAttachment(taskId, attachment) {
   return {
     id: attachment.id,
@@ -98,10 +105,48 @@ export async function saveTaskImages(taskId, images) {
     attachments.push({ id, name: image.name, type: image.type, size: image.buffer.length, createdAt });
   }
   const allAttachments = [...existing, ...attachments];
-  const temporaryFile = `${metadataFile(taskId)}.tmp`;
-  await writeFile(temporaryFile, `${JSON.stringify({ attachments: allAttachments }, null, 2)}\n`, 'utf8');
-  await rename(temporaryFile, metadataFile(taskId));
+  await writeMetadata(taskId, allAttachments);
   return attachments.map(attachment => publicAttachment(taskId, attachment));
+}
+
+export async function updateTaskImages(taskId, { keepIds = [], images = [] } = {}) {
+  assertSafeSegment(taskId, 'görev kimliği');
+  if (!Array.isArray(keepIds) || !Array.isArray(images)) throw new Error('Geçersiz görsel güncellemesi.');
+  const existing = await loadMetadata(taskId);
+  const uniqueKeepIds = [...new Set(keepIds.map(id => assertSafeSegment(id, 'görsel kimliği')))];
+  if (uniqueKeepIds.length !== keepIds.length) throw new Error('Aynı görev görseli birden fazla kez gönderilemez.');
+  const retained = uniqueKeepIds.map(id => {
+    const attachment = existing.find(candidate => candidate.id === id);
+    if (!attachment) throw new Error(`Görev görseli bulunamadı: ${id}`);
+    return attachment;
+  });
+  if (!existing.length && !images.length) return [];
+
+  const decoded = images.map(decodeTaskImage);
+  if (retained.length + decoded.length > maxTaskImages) throw new Error(`Bir göreve en fazla ${maxTaskImages} görsel eklenebilir.`);
+  const totalBytes = retained.reduce((total, image) => total + Number(image.size || 0), 0) + decoded.reduce((total, image) => total + image.buffer.length, 0);
+  if (totalBytes > maxTaskImageTotalBytes) throw new Error('Görev görsellerinin toplam boyutu en fazla 20 MB olabilir.');
+
+  const directory = taskDirectory(taskId);
+  await mkdir(directory, { recursive: true });
+  const createdAt = new Date().toISOString();
+  const added = [];
+  let nextAttachments;
+  try {
+    for (const image of decoded) {
+      const id = `${randomUUID()}.${image.extension}`;
+      await writeFile(join(directory, id), image.buffer, { mode: 0o444 });
+      added.push({ id, name: image.name, type: image.type, size: image.buffer.length, createdAt });
+    }
+    nextAttachments = [...retained, ...added];
+    await writeMetadata(taskId, nextAttachments);
+  } catch (error) {
+    await Promise.all(added.map(attachment => rm(join(directory, attachment.id), { force: true })));
+    throw error;
+  }
+  const retainedIds = new Set(uniqueKeepIds);
+  await Promise.allSettled(existing.filter(attachment => !retainedIds.has(attachment.id)).map(attachment => rm(join(directory, attachment.id), { force: true })));
+  return nextAttachments.map(attachment => publicAttachment(taskId, attachment));
 }
 
 export async function resolveTaskImages(taskId, requested = []) {

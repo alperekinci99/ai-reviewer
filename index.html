@@ -43,8 +43,8 @@
           <div class="dashboard-grid">
             <section class="focus-card dark-card">
               <div class="card-label"><span class="pulse"></span>ŞİMDİKİ ODAK</div>
-              <div class="focus-content"><p id="focus-kicker">DEVELOPER PORTAL · YAPILIYOR</p><h2 id="focus-title">Developer portal iskeletini tamamla</h2><div class="focus-meta"><span id="focus-complexity">5 puan</span><span id="focus-agent">Otomatik agent</span></div></div>
-              <div class="focus-actions"><button id="complete-focus" type="button">Tamamlandı olarak işaretle</button><button class="round-button" data-view-target="workflow" type="button" aria-label="Workflow'a git">↗</button></div>
+              <div class="focus-content"><p id="focus-kicker">DEVELOPER PORTAL · IN PROGRESS</p><h2 id="focus-title">Developer portal iskeletini tamamla</h2><div class="focus-meta"><span id="focus-complexity">5 puan</span><span id="focus-agent">Otomatik agent</span></div></div>
+              <div class="focus-actions"><button id="complete-focus" type="button">Done olarak işaretle</button><button class="round-button" data-view-target="workflow" type="button" aria-label="Workflow'a git">↗</button></div>
             </section>
 
             <section class="metric-card"><div class="metric-top"><span class="metric-icon green">↳</span><span>SON 7 GÜN</span></div><strong id="review-count">0</strong><p>kod incelemesi</p><div class="mini-bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></section>
@@ -86,7 +86,7 @@
         </section>
 
         <section id="view-workflow" class="view" data-view-panel="workflow">
-          <div class="page-heading"><div><p class="eyebrow">PROJECT FLOW</p><h1>Workflow</h1><p>Görevi Yapılıyor’a taşı; yerel agent uygulasın, Review’da sen incele.</p></div><div class="workflow-actions"><button id="azure-boards-import" class="secondary-button" type="button">Azure Boards’tan al</button><button class="primary-button" data-open-task type="button"><span>＋</span> Yeni görev</button></div></div>
+          <div class="page-heading"><div><p class="eyebrow">PROJECT FLOW</p><h1>Workflow</h1><p>Görevi In Progress’e taşı; yerel agent uygulasın, Review’da sen incele.</p></div><div class="workflow-actions"><button id="azure-boards-import" class="secondary-button" type="button">Azure Boards’tan al</button><button class="primary-button" data-open-task type="button"><span>＋</span> Yeni görev</button></div></div>
           <div id="kanban" class="kanban" aria-label="Görev panosu"></div>
         </section>
 
@@ -115,7 +115,7 @@
 
     <dialog id="task-dialog">
       <form id="task-form" method="dialog">
-        <div class="dialog-head"><div><span class="section-kicker">YENİ GÖREV</span><h2>Odağı tanımla</h2></div><button class="dialog-close" value="cancel" type="submit" formnovalidate aria-label="Kapat">×</button></div>
+        <div class="dialog-head"><div><span id="task-dialog-kicker" class="section-kicker">YENİ GÖREV</span><h2 id="task-dialog-title">Odağı tanımla</h2></div><button class="dialog-close" value="cancel" type="submit" formnovalidate aria-label="Kapat">×</button></div>
         <label>Görev adı<input name="title" required maxlength="100" placeholder="Örn. Review sonuçlarını journal'a bağla" /></label>
         <label for="task-project">Proje</label><div class="path-picker"><input id="task-project" name="project" list="project-options" required autocomplete="off" placeholder="Proje adı, kısayolu veya repository yolu" /><button class="path-picker-button" type="button" data-pick-folder data-target="task-project" data-feedback="task-error">Finder’dan seç</button></div><div class="saved-project-picker"><div class="saved-project-head"><span>KAYITLI PROJELER</span><button type="button" data-save-project data-target="task-project" data-feedback="task-error">Mevcut yolu kaydet</button></div><div class="saved-project-list" data-project-list data-target="task-project" data-feedback="task-error"></div></div>
         <label>İş puanı<select name="points"><option value="2">2 · Küçük</option><option value="3" selected>3 · Orta</option><option value="5">5 · Kapsamlı</option></select></label><small id="task-model-hint" class="field-hint">Agent ve model otomatik seçilir.</small>
@@ -123,13 +123,13 @@
         <label>Görev görselleri<input id="task-images" name="images" type="file" accept="image/png,image/jpeg,image/webp" multiple /><small>Mockup, ekran görüntüsü veya hata görseli ekleyebilirsin. En fazla 5 dosya; dosya başına 5 MB.</small></label>
         <div id="task-image-preview" class="task-image-preview" aria-live="polite"></div>
         <div id="task-error" class="dialog-error" aria-live="polite"></div>
-        <div class="dialog-actions"><button class="secondary-button" value="cancel" type="submit" formnovalidate>Vazgeç</button><button class="primary-button" value="default" type="submit">Görevi ekle</button></div>
+        <div class="dialog-actions"><button class="secondary-button" value="cancel" type="submit" formnovalidate>Vazgeç</button><button id="task-submit" class="primary-button" value="default" type="submit">Görevi ekle</button></div>
       </form>
     </dialog>
 
     <dialog id="azure-boards-dialog" class="project-dialog">
       <form id="azure-boards-form" method="dialog">
-        <div class="dialog-head"><div><span class="section-kicker">AZURE BOARDS</span><h2>İşleri içe aktar</h2><p>Yalnızca Backlog ve Todo durumundaki, seçilen kişiye atanmış işler Yapılacak kolonuna eklenir. Repository her kart üzerinden seçilir.</p></div><button class="dialog-close" value="cancel" type="submit" formnovalidate aria-label="Kapat">×</button></div>
+        <div class="dialog-head"><div><span class="section-kicker">AZURE BOARDS</span><h2>İşleri içe aktar</h2><p>Yalnızca Backlog ve Todo durumundaki, seçilen kişiye atanmış işler To Do kolonuna eklenir. Repository her kart üzerinden seçilir.</p></div><button class="dialog-close" value="cancel" type="submit" formnovalidate aria-label="Kapat">×</button></div>
         <div class="dialog-grid"><label>Organizasyon<input name="organization" required autocomplete="url" placeholder="organizasyon veya https://dev.azure.com/..." /></label><label>Azure Boards projesi<input name="azureProject" required autocomplete="off" placeholder="Örn. Platform" /></label></div>
         <label>Atanan kişi<input name="assignee" value="@Me" required autocomplete="off" placeholder="@Me veya ad / e-posta" /><small>@Me, Azure CLI ile oturum açmış hesabı kullanır.</small></label>
         <div id="azure-boards-error" class="dialog-error" aria-live="polite"></div>

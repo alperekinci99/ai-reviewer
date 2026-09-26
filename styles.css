@@ -168,8 +168,10 @@ button,input,textarea,select{font:inherit}
 .task-card.is-running{cursor:progress;border-color:#b8cca9;box-shadow:0 0 0 3px #b9f36b17}
 .task-card.is-review{cursor:grab}
 .kanban-column.dragover{outline:2px solid #98bc72;outline-offset:-2px}
-.task-card-actions{display:flex;justify-content:flex-end;align-items:center}
+.task-card-actions{display:flex;justify-content:flex-end;align-items:center;gap:5px}
 .task-menu{border:0;background:transparent;color:#969b98;cursor:pointer}
+.task-edit{border:0;border-radius:4px;background:#f0f3ed;color:#5b6d60;padding:5px 7px;font:700 8px var(--mono);cursor:pointer}
+.task-edit:hover{background:#e6ece2;color:#34493b}
 .task-card h3{font-size:12px;line-height:1.4;margin:12px 0 6px}
 .task-card p{font-size:10px;line-height:1.55;color:#7e8480;margin:0}
 .task-footer{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:15px;font:9px var(--mono);color:#999e9b}

@@ -26,8 +26,16 @@ test('görev görsellerini yerel alana güvenli biçimde kaydeder ve çözümler
     const image = await assets.readTaskImage('task-123', attachment.id);
     assert.equal(image.data.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
 
-    await assets.deleteTaskImages('task-123');
+    const [replacement] = await assets.updateTaskImages('task-123', {
+      keepIds: [],
+      images: [{ name: 'updated-mockup.png', type: 'image/png', data: onePixelPng }]
+    });
+    assert.equal(replacement.name, 'updated-mockup.png');
     await assert.rejects(access(resolved.path));
+    await access((await assets.resolveTaskImages('task-123', [replacement]))[0].path);
+
+    await assets.deleteTaskImages('task-123');
+    await assert.rejects(assets.readTaskImage('task-123', replacement.id));
   } finally {
     if (previousDirectory === undefined) delete process.env.AI_REVIEWER_TASK_ASSETS_DIR;
     else process.env.AI_REVIEWER_TASK_ASSETS_DIR = previousDirectory;

@@ -30,13 +30,13 @@ Workflow görevleri kapsam için `2`, `3` veya `5` puan alır. Puan, workflow ag
 - `3`: orta kapsamlı işler — Codex için `gpt-5.6-terra` + `medium`, Claude Code için `sonnet`.
 - `5`: çok adımlı veya riskli işler — Codex için `gpt-5.6-sol` + `high`, Claude Code için `opus`.
 
-Yeni görevler otomatik olarak `Yapılacak` durumunda oluşturulur ve kullanılabilir yerel LLM aracı otomatik seçilir. Puan yönlendirmesi kesin bir token üst sınırı değildir; model kapasitesi ve reasoning seviyesi üzerinden kullanım/kalite dengesini yönetir. AI Review modeli ve çaba ayarı bu puanlardan bağımsız kalır.
+Yeni görevler otomatik olarak `To Do` durumunda oluşturulur ve kullanılabilir yerel LLM aracı otomatik seçilir. To Do kartları; başlık, repository, puan, açıklama ve görev görselleriyle birlikte düzenlenebilir. Puan yönlendirmesi kesin bir token üst sınırı değildir; model kapasitesi ve reasoning seviyesi üzerinden kullanım/kalite dengesini yönetir. AI Review modeli ve çaba ayarı bu puanlardan bağımsız kalır.
 
 ### Otomatik workflow çalışması ve review döngüsü
 
-Bir görev `Yapılıyor` kolonuna taşındığında seçilen yerel Codex veya Claude Code aracı arka planda otomatik başlar. Görev tamamlandığında kart kendiliğinden `Review` kolonuna geçer; agent özeti, değişen dosyalar ve çalışma sohbeti görev detaylarında gösterilir.
+Bir görev `In Progress` kolonuna taşındığında seçilen yerel Codex veya Claude Code aracı arka planda otomatik başlar. Görev tamamlandığında kart kendiliğinden `Review` kolonuna geçer; agent özeti, değişen dosyalar ve çalışma sohbeti görev detaylarında gösterilir.
 
-Review kartları panoda kompakt kalır. Karta veya `Detayları gör` düğmesine tıklandığında görev açıklaması, agent özeti, model bilgisi, değişen dosyalar, sohbet geçmişi ve feedback alanı tek bir popup içinde açılır. Kod diff'i panelde çoğaltılmaz; değişiklikler doğrudan repository üzerinden incelenir. Feedback gönderildiği anda görev otomatik olarak `Yapılıyor` kolonuna döner; aynı sağlayıcı, model ve mümkün olduğunda aynı CLI oturumu devam ettirilerek yeni tur başlatılır. Agent çalışırken kart taşınamaz veya silinemez. Aynı repository üzerinde aynı anda yalnızca bir workflow görevi çalıştırılır.
+Review kartları panoda kompakt kalır. Karta veya `Detayları gör` düğmesine tıklandığında görev açıklaması, agent özeti, model bilgisi, değişen dosyalar, sohbet geçmişi ve feedback alanı tek bir popup içinde açılır. Kod diff'i panelde çoğaltılmaz; değişiklikler doğrudan repository üzerinden incelenir. Feedback gönderildiği anda görev otomatik olarak `In Progress` kolonuna döner; aynı sağlayıcı, model ve mümkün olduğunda aynı CLI oturumu devam ettirilerek yeni tur başlatılır. Agent çalışırken kart taşınamaz veya silinemez. Aynı repository üzerinde aynı anda yalnızca bir workflow görevi çalıştırılır.
 
 İlk agent turu başlamadan önce repository'nin çalışma ağacı temiz olmalıdır. Bu kontrol, kullanıcıya ait kaydedilmemiş değişikliklerin agent değişiklikleriyle karışmasını veya ezilmesini önler. İlk turdan sonra oluşan çalışma ağacı feedback turlarında aynı görev bağlamı olarak korunur.
 
@@ -56,7 +56,7 @@ AI Review ve Workflow bağımsız modüllerdir. Review’de seçilen repository,
 
 ### Azure Boards’tan iş alma
 
-Workflow ekranındaki `Azure Boards’tan al` düğmesi, seçilen Azure DevOps organizasyonu ve proje için yalnızca `Backlog`, `Todo` (ve Azure’un varsayılan `To Do`) durumundaki işleri getirir. Atanan kişi alanında `@Me` varsayılandır; farklı bir ad veya e-posta ile başka bir kişinin işleri de filtrelenebilir. İçe alınan işler `Yapılacak` durumunda eklenir; her kartın üzerindeki repository seçicisinden yerel proje bağlanmadan agent başlatılamaz. Azure Boards’taki hiçbir alan değiştirilmez.
+Workflow ekranındaki `Azure Boards’tan al` düğmesi, seçilen Azure DevOps organizasyonu ve proje için yalnızca `Backlog`, `Todo` (ve Azure’un varsayılan `To Do`) durumundaki işleri getirir. Atanan kişi alanında `@Me` varsayılandır; farklı bir ad veya e-posta ile başka bir kişinin işleri de filtrelenebilir. İçe alınan işler `To Do` durumunda eklenir; her kartın üzerindeki repository seçicisinden yerel proje bağlanmadan agent başlatılamaz. Azure Boards’taki hiçbir alan değiştirilmez.
 
 Azure iş kartındaki `Story Points` değeri workflow puanına otomatik çevrilir: `0–2 → 2`, `3–4 → 3`, `5+ → 5`. Alan boşsa uyumlu varsayılan `3` kullanılır. Karttaki `AB#…` bağlantısı Azure work item’ını doğrudan açar; örneğin `FloTechnology` organizasyonundaki `Boards Management` projesinin `73694` numaralı işi `https://dev.azure.com/FloTechnology/Boards%20Management/_workitems/edit/73694` adresine gider.
 

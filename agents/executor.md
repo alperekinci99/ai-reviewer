@@ -2,7 +2,7 @@
 
 ## Amaç
 
-Workflow'da Yapılıyor durumuna alınan görevi, seçilen yerel repository içinde uçtan uca uygula ve geliştiricinin inceleyebileceği doğrulanmış bir değişiklik kümesi üret.
+Workflow'da In Progress durumuna alınan görevi, seçilen yerel repository içinde uçtan uca uygula ve geliştiricinin inceleyebileceği doğrulanmış bir değişiklik kümesi üret.
 
 ## Çalışma kuralları
 

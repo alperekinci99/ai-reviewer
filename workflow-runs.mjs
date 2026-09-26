@@ -25,6 +25,6 @@ export async function saveWorkflowRuns(runs) {
 
 export function recoverInterruptedRuns(runs, now = new Date().toISOString()) {
   return runs.map(run => run.status === 'running'
-    ? { ...run, status: 'failed', error: 'Portal yeniden başlatıldığı için çalışma kesildi. Görevi başka bir kolona, ardından tekrar Yapılıyor kolonuna taşıyarak devam ettirebilirsin.', updatedAt: now }
+    ? { ...run, status: 'failed', error: 'Portal yeniden başlatıldığı için çalışma kesildi. Görevi başka bir kolona, ardından tekrar In Progress kolonuna taşıyarak devam ettirebilirsin.', updatedAt: now }
     : run);
 }
