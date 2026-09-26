@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 const codexCandidates = [process.env.CODEX_BIN, '/Applications/ChatGPT.app/Contents/Resources/codex', 'codex'].filter(Boolean);
@@ -93,7 +93,7 @@ function codexSessionId(stdout) {
   return null;
 }
 
-export function codexExecArgs({ mode = 'plan', sessionId, model, effort, schemaPath, outputPath }) {
+export function codexExecArgs({ mode = 'plan', sessionId, model, effort, schemaPath, outputPath, images = [] }) {
   const args = sessionId
     ? ['exec', 'resume', '--json']
     : ['exec', '--sandbox', mode === 'execute' ? 'workspace-write' : 'read-only', '--json'];
@@ -105,27 +105,35 @@ export function codexExecArgs({ mode = 'plan', sessionId, model, effort, schemaP
   if (model) args.push('--model', model);
   if (effort) args.push('-c', `model_reasoning_effort="${effort}"`);
   if (schemaPath) args.push('--output-schema', schemaPath);
+  for (const image of images) args.push('--image', image);
   args.push('-o', outputPath);
   if (sessionId) args.push(sessionId);
   args.push('-');
   return args;
 }
 
-async function runCodex({ prompt, cwd, model, effort, schemaPath, structured, mode = 'plan', sessionId }) {
+async function runCodex({ prompt, cwd, model, effort, schemaPath, structured, mode = 'plan', sessionId, images = [] }) {
   const directory = await mkdtemp(join(tmpdir(), 'orbit-codex-'));
   try {
     const outputPath = join(directory, structured ? 'result.json' : 'result.md');
-    const args = codexExecArgs({ mode, sessionId, model, effort, schemaPath, outputPath });
+    const args = codexExecArgs({ mode, sessionId, model, effort, schemaPath, outputPath, images });
     const { stdout } = await execute(binaries.codex, args, { cwd, input: prompt, maxBuffer: 8_000_000 });
     const output = (await readFile(outputPath, 'utf8')).trim();
     return { provider: 'codex', output: structured ? parseJsonText(output) : output, sessionId: sessionId || codexSessionId(stdout) };
   } finally { await rm(directory, { recursive: true, force: true }); }
 }
 
-async function runClaude({ prompt, cwd, model, structured, mode = 'plan', sessionId }) {
+export function claudeExecArgs({ model, mode = 'plan', sessionId, images = [] }) {
   const args = ['-p', '--output-format', 'json', '--permission-mode', mode === 'execute' ? 'acceptEdits' : 'plan', '--max-turns', mode === 'execute' ? '24' : '8'];
+  const imageDirectories = [...new Set(images.map(dirname))];
+  if (imageDirectories.length) args.push('--add-dir', ...imageDirectories);
   if (sessionId) args.push('--resume', sessionId);
   if (model && (model.startsWith('claude-') || ['sonnet', 'opus', 'haiku'].includes(model))) args.push('--model', model);
+  return args;
+}
+
+async function runClaude({ prompt, cwd, model, structured, mode = 'plan', sessionId, images = [] }) {
+  const args = claudeExecArgs({ model, mode, sessionId, images });
   const { stdout } = await execute(binaries.claude, args, { cwd, input: prompt });
   const envelope = JSON.parse(stdout);
   if (envelope.is_error) throw new Error(envelope.result || 'Claude Code görevi tamamlayamadı.');

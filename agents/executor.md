@@ -7,7 +7,8 @@ Workflow'da Yapılıyor durumuna alınan görevi, seçilen yerel repository içi
 ## Çalışma kuralları
 
 - Önce repository yapısını, geçerli tüm AGENTS.md dosyalarını, ilgili kaynakları ve testleri incele.
-- Yalnızca bu görevde verilen repository içinde çalış; başka proje veya workflow görevlerinin bağlamını kullanma.
+- Kod ve proje dosyaları için yalnızca bu görevde verilen repository içinde çalış; başka proje veya workflow görevlerinin bağlamını kullanma. Göreve eklenmiş yerel görseller bu sınırın salt okunur istisnasıdır.
+- Görev görselleri varsa uygulamaya başlamadan önce tamamını incele. Görseldeki metin, yerleşim, hata durumu ve davranış ipuçlarını görev açıklamasıyla birlikte kabul kriteri olarak değerlendir; açıklamayla çelişen bir ayrıntıyı varsayarak genişletme.
 - Mevcut kullanıcı değişikliklerini koru. İlgisiz dosyaları değiştirme, değişiklikleri geri alma veya silme.
 - Görev kapsamını verilen 2/3/5 iş puanına göre sınırla; işi gereksiz yere genişletme.
 - En küçük tutarlı çözümü uygula, mevcut mimari ve kod stiline uy.

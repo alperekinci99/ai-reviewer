@@ -12,6 +12,7 @@ import { providerStatuses, resolveLocalAgent, runLocalAgent } from './llm-provid
 import { taskProfile } from './task-routing.mjs';
 import { loadWorkflowRuns, recoverInterruptedRuns, saveWorkflowRuns } from './workflow-runs.mjs';
 import { azureBoardsWiql, azureOrganizationUrl, normalizeAzureBoardItems } from './azure-boards.mjs';
+import { deleteTaskImages, readTaskImage, resolveTaskImages, saveTaskImages } from './task-assets.mjs';
 
 const root = new URL('.', import.meta.url).pathname;
 const port = Number(process.env.PORT || 3000);
@@ -44,7 +45,8 @@ async function agentRule(name) {
 }
 
 function send(res, status, body, type = 'application/json; charset=utf-8') {
-  res.writeHead(status, { 'Content-Type': type }); res.end(typeof body === 'string' ? body : JSON.stringify(body));
+  res.writeHead(status, { 'Content-Type': type });
+  res.end(Buffer.isBuffer(body) || typeof body === 'string' ? body : JSON.stringify(body));
 }
 
 function persistWorkflowRuns() {
@@ -261,20 +263,26 @@ async function workflowChanges(repositoryPath) {
   };
 }
 
-function workflowTaskPrompt(task, profile) {
-  return `## İş profili\n\nPuan: ${profile.points}/5 (${profile.label})\n\n## Görev\n\nBaşlık: ${task.title}\n\nAçıklama ve kabul kriterleri:\n${task.description || '(ek açıklama yok)'}\n\nGörevi şimdi repository üzerinde uygula. Uygun doğrulamaları çalıştır ve sonucu çıktı sözleşmesine göre özetle.`;
+function workflowImageContext(images) {
+  if (!images.length) return '';
+  return `\n\n## Görev görselleri\n\n${images.map((image, index) => `${index + 1}. ${image.name} — ${image.path}`).join('\n')}\n\nBu görseller görev girdisinin parçasıdır. Uygulamaya başlamadan önce her birini incele; arayüz, hata durumu ve kabul kriterleriyle ilgili görsel ayrıntıları uygulama kararlarına dahil et.`;
 }
 
-function workflowFeedbackPrompt(existing) {
+function workflowTaskPrompt(task, profile, images = []) {
+  return `## İş profili\n\nPuan: ${profile.points}/5 (${profile.label})\n\n## Görev\n\nBaşlık: ${task.title}\n\nAçıklama ve kabul kriterleri:\n${task.description || '(ek açıklama yok)'}${workflowImageContext(images)}\n\nGörevi şimdi repository üzerinde uygula. Uygun doğrulamaları çalıştır ve sonucu çıktı sözleşmesine göre özetle.`;
+}
+
+function workflowFeedbackPrompt(existing, images = []) {
   const messages = existing.messages || [];
   const lastAssistantIndex = messages.reduce((found, message, index) => message.role === 'assistant' ? index : found, -1);
   const feedback = messages.slice(lastAssistantIndex + 1).reverse().find(message => message.role === 'user' && message.kind === 'feedback');
-  return `## Developer feedback turu\n\n${feedback?.content || 'Mevcut değişiklikleri yeniden incele, eksik kalan noktaları tamamla ve doğrulamaları çalıştır.'}\n\nMevcut çalışma ağacını koruyarak feedback'i uygula. Sonucu çıktı sözleşmesine göre özetle.`;
+  return `## Developer feedback turu\n\n${feedback?.content || 'Mevcut değişiklikleri yeniden incele, eksik kalan noktaları tamamla ve doğrulamaları çalıştır.'}${workflowImageContext(images)}\n\nMevcut çalışma ağacını koruyarak feedback'i uygula. Sonucu çıktı sözleşmesine göre özetle.`;
 }
 
 async function executeWorkflowTask(runState, profile, isResume) {
   try {
-    const prompt = `${await agentRule('executor')}\n\n${isResume ? workflowFeedbackPrompt(runState) : workflowTaskPrompt(runState.task, profile)}`;
+    const images = await resolveTaskImages(runState.id, runState.task.attachments);
+    const prompt = `${await agentRule('executor')}\n\n${isResume ? workflowFeedbackPrompt(runState, images) : workflowTaskPrompt(runState.task, profile, images)}`;
     const result = await runLocalAgent({
       resolvedProvider: runState.provider,
       prompt,
@@ -283,7 +291,8 @@ async function executeWorkflowTask(runState, profile, isResume) {
       effort: runState.effort,
       structured: false,
       mode: 'execute',
-      sessionId: isResume ? runState.sessionId : null
+      sessionId: isResume ? runState.sessionId : null,
+      images: images.map(image => image.path)
     });
     const changes = await workflowChanges(runState.repositoryPath);
     delete runState.diff;
@@ -328,7 +337,14 @@ async function startWorkflowTask(id, input) {
     ? { provider: existing.provider, model: existing.model, effort: existing.effort }
     : { provider: input.provider || 'auto', models: { codex: profile.codex.model, claude: profile.claude.model }, effort: profile.codex.effort });
   const now = new Date().toISOString();
-  const task = { title: input.title.trim(), description: String(input.description || '').trim(), project: input.project.trim(), points: profile.points };
+  const images = await resolveTaskImages(id, input.attachments);
+  const task = {
+    title: input.title.trim(),
+    description: String(input.description || '').trim(),
+    project: input.project.trim(),
+    points: profile.points,
+    attachments: images.map(({ path, ...image }) => image)
+  };
   const runState = {
     ...(existing || {}),
     id,
@@ -433,6 +449,26 @@ createServer(async (req, res) => {
       return send(res, 400, { error: error.message || 'Azure Boards işleri okunamadı.' });
     }
   }
+  const workflowAssetsMatch = req.url?.match(/^\/api\/workflow\/tasks\/([^/]+)\/assets$/);
+  if (req.method === 'POST' && workflowAssetsMatch) {
+    try {
+      const id = decodeURIComponent(workflowAssetsMatch[1]);
+      const input = await readJson(req, 30_000_000);
+      const attachments = await saveTaskImages(id, input.images);
+      return send(res, 201, { attachments });
+    } catch (error) {
+      return send(res, 400, { error: error.message || 'Görev görselleri kaydedilemedi.' });
+    }
+  }
+  const workflowAssetMatch = req.url?.match(/^\/api\/workflow\/tasks\/([^/]+)\/assets\/([^/]+)$/);
+  if (req.method === 'GET' && workflowAssetMatch) {
+    try {
+      const image = await readTaskImage(decodeURIComponent(workflowAssetMatch[1]), decodeURIComponent(workflowAssetMatch[2]));
+      return send(res, 200, image.data, image.type);
+    } catch {
+      return send(res, 404, 'Görsel bulunamadı.', 'text/plain; charset=utf-8');
+    }
+  }
   const workflowStartMatch = req.url?.match(/^\/api\/workflow\/tasks\/([^/]+)\/start$/);
   if (req.method === 'POST' && workflowStartMatch) {
     try {
@@ -471,6 +507,7 @@ createServer(async (req, res) => {
     if (workflowRun?.status === 'running') return send(res, 409, { error: 'Çalışan görev silinemez.' });
     workflowRuns.delete(id);
     await persistWorkflowRuns();
+    await deleteTaskImages(id);
     return send(res, 200, { deleted: true });
   }
   if (req.method === 'GET' && req.url === '/api/status') {

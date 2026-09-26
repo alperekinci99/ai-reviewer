@@ -11,6 +11,7 @@ const taskProfiles = {
   5: { label: 'Kapsamlı', codex: 'GPT-5.6 Sol · yüksek', claude: 'Claude Opus' }
 };
 const taskPoints = value => [2, 3, 5].includes(Number(value)) ? Number(value) : 3;
+const taskAttachmentUrl = (task, attachment) => `/api/workflow/tasks/${encodeURIComponent(task.id)}/assets/${encodeURIComponent(attachment.id)}`;
 
 const defaults = {
   reviews: 0,
@@ -63,6 +64,7 @@ function loadState() {
           ...(legacyUpdate || {}),
           project: legacyProject ? (seedTitles.has(task.title) ? 'Developer Portal' : 'Genel') : typeof task.project === 'string' && task.project.trim() ? task.project : task.azureBoards ? '' : 'Genel',
           points: seedPoints[task.title] || ([2, 3, 5].includes(Number(task.points)) ? Number(task.points) : task.priority === 'high' ? 5 : task.priority === 'low' ? 2 : 3),
+          attachments: Array.isArray(task.attachments) ? task.attachments.filter(attachment => attachment && typeof attachment.id === 'string') : [],
           workflowStarting: false
         };
       }),
@@ -208,6 +210,13 @@ function openWorkflowTaskDetails(taskId) {
   $('#workflow-task-title').textContent = task.title;
   $('#workflow-task-meta').innerHTML = `<span>${escape(task.project || 'Projesiz')}</span><span>${taskPoints(task.points)} puan</span><span>${escape(provider)}</span><span>${escape(run.model || 'varsayılan model')}</span><span>${run.attempt || 1}. tur</span>`;
   $('#workflow-task-description').textContent = task.description || 'Ek görev açıklaması bulunmuyor.';
+  const attachments = Array.isArray(task.attachments) ? task.attachments : [];
+  $('#workflow-task-images-section').hidden = !attachments.length;
+  $('#workflow-task-image-count').textContent = `${attachments.length} görsel`;
+  $('#workflow-task-images').innerHTML = attachments.map(attachment => {
+    const url = taskAttachmentUrl(task, attachment);
+    return `<a href="${escape(url)}" target="_blank" rel="noreferrer" title="${escape(attachment.name)}"><img src="${escape(url)}" alt="${escape(attachment.name)}" loading="lazy" /><span>${escape(attachment.name)}</span></a>`;
+  }).join('');
   $('#workflow-task-summary').textContent = run.summary || 'Agent özeti bulunmuyor.';
   $('#workflow-task-files').innerHTML = (run.changedFiles || []).map(file => `<span>${escape(file)}</span>`).join('');
   $('#workflow-task-change-count').textContent = `${run.changedFiles?.length || 0} dosya`;
@@ -266,10 +275,11 @@ function renderTasks() {
       const running = run?.status === 'running';
       const localError = task.workflowError && !['running', 'review'].includes(run?.status) ? `<div class="run-state failed"><b>Başlatılamadı</b><span>${escape(task.workflowError)}</span></div>` : '';
       const azureLink = task.azureBoards?.url ? `<a class="azure-work-item" href="${escape(task.azureBoards.url)}" target="_blank" rel="noreferrer" title="Azure Boards #${escape(task.azureBoards.id)} işini aç">AB#${escape(task.azureBoards.id)}${task.azureBoards.storyPoints !== null && task.azureBoards.storyPoints !== undefined ? ` · SP ${escape(task.azureBoards.storyPoints)}` : ''} ↗</a>` : '';
+      const attachmentBadge = task.attachments?.length ? `<span class="task-attachment-badge">▧ ${task.attachments.length} görsel</span>` : '';
       const projectControl = task.azureBoards && !task.project
         ? `<select class="task-project-select" data-task-project-select="${escape(task.id)}" aria-label="Repository seç"><option value="">Repository seç…</option>${savedProjects.map(project => `<option value="${escape(project.name)}">${escape(project.name)}</option>`).join('')}</select>`
         : `<span class="task-tag">${escape(task.project || 'Projesiz')}</span>`;
-      return `<article class="task-card${running ? ' is-running' : ''}${task.status === 'review' ? ' is-review' : ''}" draggable="${running ? 'false' : 'true'}" data-task-id="${escape(task.id)}"><div class="task-card-actions"><button class="task-menu" type="button" data-delete-task="${escape(task.id)}" aria-label="Görevi sil" ${running ? 'disabled' : ''}>×</button></div><h3>${escape(task.title)}</h3>${task.description ? `<p>${escape(task.description)}</p>` : ''}<div class="task-footer">${projectControl}<span class="task-points points-${points}" title="${escape(profile.codex)} · ${escape(profile.claude)}">${points} puan · ${escape(profile.label)}</span></div>${azureLink}${localError || workflowRunCard(task, run)}</article>`;
+      return `<article class="task-card${running ? ' is-running' : ''}${task.status === 'review' ? ' is-review' : ''}" draggable="${running ? 'false' : 'true'}" data-task-id="${escape(task.id)}"><div class="task-card-actions"><button class="task-menu" type="button" data-delete-task="${escape(task.id)}" aria-label="Görevi sil" ${running ? 'disabled' : ''}>×</button></div><h3>${escape(task.title)}</h3>${task.description ? `<p>${escape(task.description)}</p>` : ''}<div class="task-footer">${projectControl}<span class="task-points points-${points}" title="${escape(profile.codex)} · ${escape(profile.claude)}">${points} puan · ${escape(profile.label)}</span></div>${azureLink}${attachmentBadge}${localError || workflowRunCard(task, run)}</article>`;
     }).join('');
     return `<section class="kanban-column" data-status="${column.id}"><header class="column-head"><span>${column.label}</span><span class="column-count">${tasks.length}</span></header><div class="task-list">${cards}</div></section>`;
   }).join('');
@@ -283,7 +293,7 @@ function renderTasks() {
     const task = state.tasks.find(item => item.id === card.dataset.taskId);
     if (task?.status === 'review' && workflowRuns.get(task.id)?.status === 'review') {
       card.addEventListener('click', event => {
-        if (!event.target.closest('button, textarea, input, form')) openWorkflowTaskDetails(task.id);
+        if (!event.target.closest('button, a, textarea, input, form')) openWorkflowTaskDetails(task.id);
       });
     }
   });
@@ -462,6 +472,47 @@ const taskDialog = $('#task-dialog');
 const taskForm = $('#task-form');
 const azureBoardsDialog = $('#azure-boards-dialog');
 const azureBoardsForm = $('#azure-boards-form');
+const taskImagesInput = $('#task-images');
+const taskImageTypes = new Set(['image/png', 'image/jpeg', 'image/webp']);
+let selectedTaskImages = [];
+let taskImagePreviewUrls = [];
+
+function renderTaskImagePreviews() {
+  taskImagePreviewUrls.forEach(URL.revokeObjectURL);
+  taskImagePreviewUrls = selectedTaskImages.map(file => URL.createObjectURL(file));
+  $('#task-image-preview').innerHTML = selectedTaskImages.map((file, index) => `<div class="task-image-item"><img src="${taskImagePreviewUrls[index]}" alt="${escape(file.name)}" /><span>${escape(file.name)}</span><button type="button" data-remove-task-image="${index}" aria-label="${escape(file.name)} görselini kaldır">×</button></div>`).join('');
+  $$('[data-remove-task-image]').forEach(button => button.addEventListener('click', () => {
+    selectedTaskImages.splice(Number(button.dataset.removeTaskImage), 1);
+    renderTaskImagePreviews();
+  }));
+}
+
+function resetTaskImages() {
+  selectedTaskImages = [];
+  taskImagesInput.value = '';
+  renderTaskImagePreviews();
+}
+
+function fileDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error(`${file.name} okunamadı.`));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function uploadTaskImages(taskId) {
+  if (!selectedTaskImages.length) return [];
+  const images = await Promise.all(selectedTaskImages.map(async file => ({ name: file.name, type: file.type, data: await fileDataUrl(file) })));
+  const response = await fetch(`/api/workflow/tasks/${encodeURIComponent(taskId)}/assets`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ images })
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Görev görselleri kaydedilemedi.');
+  return data.attachments || [];
+}
+
 function updateTaskModelHint() {
   const points = taskPoints(taskForm.elements.points.value);
   const profile = taskProfiles[points];
@@ -469,24 +520,55 @@ function updateTaskModelHint() {
   $('#task-model-hint').textContent = `Otomatik agent · ${route}`;
 }
 $$('[data-open-task]').forEach(button => button.addEventListener('click', () => {
+  taskForm.reset();
+  resetTaskImages();
   $('#task-error').textContent = '';
   updateTaskModelHint();
   taskDialog.showModal();
 }));
 taskForm.elements.points.addEventListener('change', updateTaskModelHint);
-taskForm.addEventListener('submit', event => {
+taskImagesInput.addEventListener('change', event => {
+  const files = [...event.currentTarget.files];
+  event.currentTarget.value = '';
+  const invalidType = files.find(file => !taskImageTypes.has(file.type));
+  const oversized = files.find(file => file.size > 5 * 1024 * 1024);
+  if (invalidType) return void ($('#task-error').textContent = 'Yalnızca PNG, JPEG veya WEBP görselleri eklenebilir.');
+  if (oversized) return void ($('#task-error').textContent = `${oversized.name} 5 MB sınırını aşıyor.`);
+  if (selectedTaskImages.length + files.length > 5) return void ($('#task-error').textContent = 'Bir göreve en fazla 5 görsel eklenebilir.');
+  if ([...selectedTaskImages, ...files].reduce((total, file) => total + file.size, 0) > 20 * 1024 * 1024) return void ($('#task-error').textContent = 'Görev görsellerinin toplam boyutu en fazla 20 MB olabilir.');
+  selectedTaskImages.push(...files);
+  $('#task-error').textContent = '';
+  renderTaskImagePreviews();
+});
+taskDialog.addEventListener('close', () => {
+  taskForm.reset();
+  resetTaskImages();
+  updateTaskModelHint();
+});
+taskForm.addEventListener('submit', async event => {
   if (event.submitter?.value === 'cancel') return;
   event.preventDefault();
+  const button = event.submitter || taskForm.querySelector('.primary-button');
   const values = Object.fromEntries(new FormData(event.currentTarget));
   const points = taskPoints(values.points);
-  const task = { id: crypto.randomUUID(), title: values.title.trim(), description: values.description.trim(), project: values.project.trim(), points, status: 'todo', createdAt: Date.now() };
-  state.tasks.unshift(task);
-  addActivity('＋', values.title.trim(), `${values.project.trim()} · ${points} puanlık workflow görevi`);
-  event.currentTarget.reset();
-  updateTaskModelHint();
-  taskDialog.close();
-  persistAndRender();
-  showView('workflow');
+  const id = crypto.randomUUID();
+  button.disabled = true;
+  button.textContent = selectedTaskImages.length ? 'Görseller kaydediliyor…' : 'Görev ekleniyor…';
+  $('#task-error').textContent = '';
+  try {
+    const attachments = await uploadTaskImages(id);
+    const task = { id, title: values.title.trim(), description: values.description.trim(), project: values.project.trim(), points, attachments, status: 'todo', createdAt: Date.now() };
+    state.tasks.unshift(task);
+    addActivity('＋', values.title.trim(), `${values.project.trim()} · ${points} puanlık workflow görevi`);
+    taskDialog.close();
+    persistAndRender();
+    showView('workflow');
+  } catch (error) {
+    $('#task-error').textContent = error.message;
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Görevi ekle';
+  }
 });
 
 $('#azure-boards-import').addEventListener('click', () => {
