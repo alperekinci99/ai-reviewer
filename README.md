@@ -12,9 +12,9 @@ Node.js 18 veya üstü, macOS ve desteklenen yerel araçlardan en az biri gereki
 npm run dev
 ```
 
-Ardından `http://localhost:3000` adresini açın. AI Review ekranındaki proje seçiciden repository yolunu yazın veya `Finder’dan seç` ile repository klasörünü seçin; ardından inceleme türünü ve commit/PR hedefini girin. Bir proje seçilene kadar review alanları kilitli kalır.
+Ardından `http://localhost:3000` adresini açın. Reviewer ekranındaki proje seçiciden repository yolunu yazın veya `Finder’dan seç` ile repository klasörünü seçin; ardından inceleme türünü ve commit/PR hedefini girin. Bir proje seçilene kadar review alanları kilitli kalır.
 
-AI çalışmaları seçilen yerel aracın hesabındaki kullanım kotasından harcanır. AI Review salt-okunur modda çalışır. Workflow executor ise yalnızca seçilen repository için yazma izniyle çalışır; commit, push veya dış sisteme yazma yapmaz.
+AI çalışmaları seçilen yerel aracın hesabındaki kullanım kotasından harcanır. Reviewer salt-okunur modda çalışır. Workflow executor ise yalnızca seçilen repository için yazma izniyle çalışır; commit, push veya dış sisteme yazma yapmaz.
 
 ## Agent kuralları ve yerel sağlayıcılar
 
@@ -30,7 +30,7 @@ Workflow görevleri kapsam için `2`, `3` veya `5` puan alır. Puan, workflow ag
 - `3`: orta kapsamlı işler — Codex için `gpt-5.6-terra` + `medium`, Claude Code için `sonnet`.
 - `5`: çok adımlı veya riskli işler — Codex için `gpt-5.6-sol` + `high`, Claude Code için `opus`.
 
-Yeni görevler otomatik olarak `To Do` durumunda oluşturulur ve kullanılabilir yerel LLM aracı otomatik seçilir. To Do kartları; başlık, repository, puan, açıklama ve görev görselleriyle birlikte düzenlenebilir. Puan yönlendirmesi kesin bir token üst sınırı değildir; model kapasitesi ve reasoning seviyesi üzerinden kullanım/kalite dengesini yönetir. AI Review modeli ve çaba ayarı bu puanlardan bağımsız kalır.
+Yeni görevler otomatik olarak `To Do` durumunda oluşturulur ve kullanılabilir yerel LLM aracı otomatik seçilir. To Do kartları; başlık, repository, puan, açıklama ve görev görselleriyle birlikte düzenlenebilir. Puan yönlendirmesi kesin bir token üst sınırı değildir; model kapasitesi ve reasoning seviyesi üzerinden kullanım/kalite dengesini yönetir. Reviewer modeli ve çaba ayarı bu puanlardan bağımsız kalır.
 
 ### Otomatik workflow çalışması ve review döngüsü
 
@@ -50,9 +50,9 @@ Codex Desktop’ın varsayılan macOS yolu otomatik algılanır. Farklı bir Cod
 
 ## Repository seçimi
 
-Review repository seçimi tamamen AI Review ekranından yapılır. Yol elle yazılabilir, kayıtlı proje kısayolu kullanılabilir veya macOS Finder üzerinden klasör seçilebilir. `commit` seçildiğinde commit alanı boş bırakılırsa `HEAD` kullanılır. `pr` seçildiğinde GitHub veya Azure DevOps pull request URL’sini ya da yalnızca PR numarasını girin. Workflow görevleri kendi proje seçimine ve Finder butonuna sahiptir; bu nedenle aynı panoda farklı repository'lere ait işler tutulabilir.
+Review repository seçimi tamamen Reviewer ekranından yapılır. Yol elle yazılabilir, kayıtlı proje kısayolu kullanılabilir veya macOS Finder üzerinden klasör seçilebilir. `commit` seçildiğinde commit alanı boş bırakılırsa `HEAD` kullanılır. `pr` seçildiğinde GitHub veya Azure DevOps pull request URL’sini ya da yalnızca PR numarasını girin. Workflow görevleri kendi proje seçimine ve Finder butonuna sahiptir; bu nedenle aynı panoda farklı repository'lere ait işler tutulabilir.
 
-AI Review ve Workflow bağımsız modüllerdir. Review’de seçilen repository, sağlayıcı veya tamamlanan inceleme Workflow görevlerini oluşturmaz ya da değiştirmez. Her Workflow görevinin proje ve yerel LLM seçimi yalnızca görev oluşturulurken verilen değerden gelir.
+Reviewer ve Workflow bağımsız modüllerdir. Reviewer’da seçilen repository, sağlayıcı veya tamamlanan inceleme Workflow görevlerini oluşturmaz ya da değiştirmez. Her Workflow görevinin proje ve yerel LLM seçimi yalnızca görev oluşturulurken verilen değerden gelir.
 
 ### Azure Boards’tan iş alma
 

@@ -14,7 +14,6 @@ button,input,textarea,select{font:inherit}
 .nav-item.active{color:#fff;background:#1b1f22}
 .nav-icon{font:18px var(--mono);color:#aab0ad}
 .nav-item.active .nav-icon{color:var(--lime)}
-.nav-badge{font:500 9px var(--mono);letter-spacing:.5px;text-transform:uppercase;color:#111;background:var(--lime);padding:3px 5px;border-radius:3px}
 .sidebar-bottom{margin-top:auto}
 .local-state{display:flex;align-items:center;gap:8px;padding:12px 10px;color:#737a7a;font-size:11px;border-bottom:1px solid #25292c}
 .local-state i{width:6px;height:6px;border-radius:50%;background:#70b586;box-shadow:0 0 0 3px #70b58616}
@@ -149,6 +148,8 @@ button,input,textarea,select{font:inherit}
 .diff-preview-head{display:flex;justify-content:space-between;align-items:end;padding:21px 22px 15px}
 .diff-preview-head>span{font-size:9px;color:#979b99}
 .diff-preview{height:430px;overflow:auto;margin:0;padding:12px 0 22px;background:#111418;color:#a7afab;font:10px/1.6 var(--mono)}
+.diff-preview.is-empty{display:grid;place-items:center;padding:28px;text-align:center}
+.diff-empty{max-width:320px;padding:12px 16px;border:1px solid #2b3033;border-radius:7px;background:#171a1e;color:#7f8883;white-space:normal}
 .diff-line{display:block;padding:0 18px;white-space:pre}
 .diff-line.meta{color:#aa96ca;background:#1b1821}
 .diff-line.hunk{color:#8ba9c2;background:#171d22}
@@ -253,7 +254,9 @@ button,input,textarea,select{font:inherit}
 .calendar-day{aspect-ratio:1;border:0;background:transparent;border-radius:50%;font-size:10px;color:#69706c;cursor:pointer}
 .calendar-day:hover{background:#f0f2ed}
 .calendar-day.muted{color:#c0c3c0}
+.calendar-day.selected{background:#e7eee2;color:#3f5e49;font-weight:700;box-shadow:inset 0 0 0 1px #bfd0b5}
 .calendar-day.today{background:#171a1d;color:var(--lime);font-weight:700}
+.calendar-day.today.selected{box-shadow:0 0 0 2px #b9f36b55}
 .calendar-day.has-entry:after{content:'';display:block;width:3px;height:3px;border-radius:50%;background:#7fa16e;margin:2px auto 0}
 .journal-feed{min-width:0}
 .journal-entry{position:relative;padding:0 0 18px 27px;border-left:1px solid #d9ddd6}

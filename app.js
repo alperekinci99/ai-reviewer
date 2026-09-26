@@ -394,15 +394,24 @@ function renderCalendar() {
   const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7;
   const start = new Date(year, month, 1 - firstWeekday);
   $('#calendar-grid').innerHTML = Array.from({ length: 42 }, (_, index) => {
-    const day = new Date(year, month, start.getDate() + index);
+    const day = new Date(start);
+    day.setDate(start.getDate() + index);
     const key = dateKey(day);
     const classes = ['calendar-day'];
     if (day.getMonth() !== month) classes.push('muted');
+    if (key === selectedJournalDate) classes.push('selected');
     if (key === dateKey(today)) classes.push('today');
     if (state.journal[key]?.length) classes.push('has-entry');
-    return `<button class="${classes.join(' ')}" data-journal-date="${key}" type="button">${day.getDate()}</button>`;
+    const label = new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }).format(day);
+    const current = key === dateKey(today) ? ' aria-current="date"' : '';
+    return `<button class="${classes.join(' ')}" data-journal-date="${key}" type="button" aria-label="${escape(label)}" aria-pressed="${key === selectedJournalDate}"${current}>${day.getDate()}</button>`;
   }).join('');
-  $$('[data-journal-date]').forEach(button => button.addEventListener('click', () => { selectedJournalDate = button.dataset.journalDate; renderJournal(); }));
+  $$('[data-journal-date]').forEach(button => button.addEventListener('click', () => {
+    selectedJournalDate = button.dataset.journalDate;
+    const selected = new Date(`${selectedJournalDate}T12:00:00`);
+    if (selected.getMonth() !== month || selected.getFullYear() !== year) calendarDate = new Date(selected.getFullYear(), selected.getMonth(), 1);
+    renderJournal();
+  }));
 }
 
 function renderJournal() {
@@ -729,7 +738,8 @@ function renderCommit(commit, reviewType) {
 
 function renderDiff() {
   const diff = diffInput.value;
-  if (!diff) { diffPreview.innerHTML = '<code>Repository bağlamı yüklendiğinde diff burada görünür.</code>'; return; }
+  diffPreview.classList.toggle('is-empty', !diff);
+  if (!diff) { diffPreview.innerHTML = '<code class="diff-empty">Repository bağlamı yüklendiğinde diff burada görünür.</code>'; return; }
   diffPreview.innerHTML = diff.split('\n').map(line => {
     const type = line.startsWith('diff --git') || line.startsWith('index ') ? 'meta' : line.startsWith('@@') ? 'hunk' : line.startsWith('+++') ? 'file-add' : line.startsWith('---') ? 'file-remove' : line.startsWith('+') ? 'addition' : line.startsWith('-') ? 'deletion' : 'context';
     return `<span class="diff-line ${type}">${escape(line) || ' '}</span>`;

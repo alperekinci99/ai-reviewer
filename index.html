@@ -15,7 +15,7 @@
         <a class="brand" href="#dashboard" aria-label="Orbit ana sayfa"><span class="brand-mark">O</span><span>orbit</span></a>
         <nav class="main-nav">
           <button class="nav-item active" data-view="dashboard" type="button"><span class="nav-icon">⌂</span><span>Genel bakış</span></button>
-          <button class="nav-item" data-view="review" type="button"><span class="nav-icon">↳</span><span>AI Review</span><span class="nav-badge">AI</span></button>
+          <button class="nav-item" data-view="review" type="button"><span class="nav-icon">↳</span><span>Reviewer</span></button>
           <button class="nav-item" data-view="workflow" type="button"><span class="nav-icon">◇</span><span>Workflow</span></button>
           <button class="nav-item" data-view="journal" type="button"><span class="nav-icon">□</span><span>Dev Journal</span></button>
         </nav>
@@ -69,7 +69,7 @@
         </section>
 
         <section id="view-review" class="view" data-view-panel="review">
-          <div class="page-heading"><div><p class="eyebrow">QUALITY GATE</p><h1>AI Code Review</h1><p>Commit veya pull request değişikliklerini kanıta dayalı olarak incele.</p></div><div class="review-project-context"><span id="repository" class="repo-pill">Proje seçilmedi</span><button id="review-project-switcher" class="secondary-button" type="button"><span>＋</span> Proje seç</button></div></div>
+          <div class="page-heading"><div><p class="eyebrow">QUALITY GATE</p><h1>Reviewer</h1><p>Commit veya pull request değişikliklerini kanıta dayalı olarak incele.</p></div><div class="review-project-context"><span id="repository" class="repo-pill">Proje seçilmedi</span><button id="review-project-switcher" class="secondary-button" type="button"><span>＋</span> Proje seç</button></div></div>
           <div id="context-error" class="context-error" hidden></div>
           <form id="review-form" class="review-layout is-disabled" aria-disabled="true">
             <section class="review-main panel">
@@ -79,7 +79,7 @@
               </div>
               <textarea id="diff-input" name="diff" hidden disabled></textarea>
               <div class="diff-preview-head"><div><span class="section-kicker">DEĞİŞİKLİKLER</span><h2>Diff önizleme</h2></div><span>+ ekleme&nbsp;&nbsp; − silme</span></div>
-              <pre id="diff-preview" class="diff-preview"><code>Repository bağlamı yüklendiğinde diff burada görünür.</code></pre>
+              <pre id="diff-preview" class="diff-preview is-empty"><code class="diff-empty">Repository bağlamı yüklendiğinde diff burada görünür.</code></pre>
             </section>
             <aside class="review-controls panel">
               <div><span class="section-kicker">İNCELEME AYARLARI</span><h2>Review kapsamı</h2></div>

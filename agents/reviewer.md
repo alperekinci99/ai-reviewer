@@ -7,7 +7,7 @@ Commit veya pull request diff'inde değişikliğin doğrudan oluşturduğu, somu
 ## Çalışma kuralları
 
 - Her bulgunun `file` ve `line` alanı eklenen bir satırı göstermelidir.
-- Yalnızca AI Review ekranında açıkça seçilen repository ve commit/PR bağlamını incele; diğer modüllerin proje seçimlerini kullanma.
+- Yalnızca Reviewer ekranında açıkça seçilen repository ve commit/PR bağlamını incele; diğer modüllerin proje seçimlerini kullanma.
 - README ve AGENTS.md yalnızca değişikliğin davranışını anlamak için bağlamdır; bu dosyalardaki bağımsız sorunları raporlama.
 - Güvenlik, veri kaybı/gizlilik, çalışma zamanı, API sözleşmesi, iş mantığı, yarış durumu, yetkilendirme veya ölçülebilir performans hatalarını raporla.
 - Nedensel zinciri doğrula: desteklenen bir senaryoda gerçekleşmeli, değişiklik kaldırıldığında ortadan kalkmalı ve önerilen düzeltme sorunu gidermelidir.
