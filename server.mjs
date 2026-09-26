@@ -1,16 +1,18 @@
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
-import { basename, extname, join } from 'node:path';
+import { mkdir, readFile } from 'node:fs/promises';
+import { basename, dirname, extname, join } from 'node:path';
 import { existsSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { homedir } from 'node:os';
+import { createHash } from 'node:crypto';
 import { limitReviewToChangedCode } from './review-scope.mjs';
 import { azurePullRequestUrl } from './pr-url.mjs';
 import { isDirectory, loadProjects, saveProjects } from './project-config.mjs';
 import { agentUsage, providerStatuses, resolveLocalAgent, runLocalAgent } from './llm-providers.mjs';
 import { taskProfile } from './task-routing.mjs';
-import { loadWorkflowRuns, recoverInterruptedRuns, saveWorkflowRuns } from './workflow-runs.mjs';
+import { loadWorkflowRuns, recoverInterruptedRuns, saveWorkflowRuns, workflowWorktreesDirectory } from './workflow-runs.mjs';
+import { suggestedCommitMessage, validateCommitMessage, workflowBranchName } from './workflow-git.mjs';
 import { azureBoardsWiql, azureOrganizationUrl, normalizeAzureBoardItems } from './azure-boards.mjs';
 import { deleteTaskImages, readTaskImage, resolveTaskImages, saveTaskImages, updateTaskImages } from './task-assets.mjs';
 
@@ -234,7 +236,11 @@ async function runReviewAgent(prompt, provider, model, reasoningEffort) {
 }
 
 async function gitAt(repositoryPath, args) {
-  return (await run('git', ['-C', repositoryPath, ...args], { maxBuffer: 12_000_000 })).stdout;
+  return (await run('git', ['-C', repositoryPath, ...args], {
+    maxBuffer: 12_000_000,
+    timeout: 120_000,
+    env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+  })).stdout;
 }
 
 async function azureBoardItems(input) {
@@ -261,6 +267,25 @@ async function workflowChanges(repositoryPath) {
   return {
     changedFiles: statusText.trim().split('\n').filter(Boolean).map(line => line.slice(3).replace(/^"|"$/g, ''))
   };
+}
+
+function workflowWorktreePath(sourceRepositoryPath, taskId) {
+  const repositoryKey = `${basename(sourceRepositoryPath)}-${createHash('sha256').update(sourceRepositoryPath).digest('hex').slice(0, 8)}`;
+  const taskKey = String(taskId).replace(/[^a-z0-9_-]/gi, '-').slice(0, 64);
+  return join(workflowWorktreesDirectory, repositoryKey, taskKey);
+}
+
+async function prepareWorkflowWorktree(sourceRepositoryPath, taskId, task) {
+  const branchName = workflowBranchName(taskId, task);
+  const worktreePath = workflowWorktreePath(sourceRepositoryPath, taskId);
+  await mkdir(dirname(worktreePath), { recursive: true });
+  try {
+    await gitAt(sourceRepositoryPath, ['worktree', 'add', '-b', branchName, worktreePath, 'HEAD']);
+  } catch (error) {
+    const detail = error.stderr?.trim() || error.message;
+    throw new Error(`Görev için izole çalışma alanı oluşturulamadı. Branch veya worktree daha önce oluşturulmuş olabilir: ${detail}`);
+  }
+  return { branchName, worktreePath };
 }
 
 function workflowImageContext(images) {
@@ -321,15 +346,14 @@ async function startWorkflowTask(id, input) {
   if (typeof input.project !== 'string' || !input.project.trim()) throw new Error('Göreve bağlı repository seçilmedi.');
   if (!supportedProviders.has(input.provider || 'auto')) throw new Error('Geçersiz yerel LLM sağlayıcısı.');
   const profile = taskProfile(input.points);
-  const repositoryPath = await resolveRepository(input.project);
-  await gitAt(repositoryPath, ['rev-parse', '--is-inside-work-tree']);
+  const sourceRepositoryPath = await resolveRepository(input.project);
+  await gitAt(sourceRepositoryPath, ['rev-parse', '--is-inside-work-tree']);
   const existing = workflowRuns.get(id);
   if (existing?.status === 'running') throw new Error('Bu görev zaten çalışıyor.');
-  if (existing?.sessionId && existing.repositoryPath !== repositoryPath) throw new Error('Devam eden agent oturumunun repository’si değiştirilemez.');
-  const competingRun = [...workflowRuns.values()].find(item => item.id !== id && item.status === 'running' && item.repositoryPath === repositoryPath);
-  if (competingRun) throw new Error('Bu repository üzerinde başka bir workflow görevi çalışıyor.');
-  if (!existing?.sessionId) {
-    const dirty = (await gitAt(repositoryPath, ['status', '--porcelain'])).trim();
+  if (existing?.sourceRepositoryPath && existing.sourceRepositoryPath !== sourceRepositoryPath) throw new Error('Devam eden agent oturumunun repository’si değiştirilemez.');
+  const legacySession = Boolean(existing?.sessionId && !existing?.worktreePath);
+  if (!existing?.worktreePath && !legacySession) {
+    const dirty = (await gitAt(sourceRepositoryPath, ['status', '--porcelain'])).trim();
     if (dirty) throw new Error('Repository’de kaydedilmemiş değişiklikler var. Mevcut çalışmanı commit/stash yaptıktan sonra görevi yeniden In Progress’e taşı; böylece agent yalnızca kendi değişiklikleri üzerinde çalışır.');
   }
   const isResume = Boolean(existing?.sessionId);
@@ -343,13 +367,28 @@ async function startWorkflowTask(id, input) {
     description: String(input.description || '').trim(),
     project: input.project.trim(),
     points: profile.points,
-    attachments: images.map(({ path, ...image }) => image)
+    attachments: images.map(({ path, ...image }) => image),
+    azureBoards: input.azureBoards && Number.isInteger(Number(input.azureBoards.id)) ? {
+      id: Number(input.azureBoards.id),
+      organization: String(input.azureBoards.organization || ''),
+      project: String(input.azureBoards.project || ''),
+      url: String(input.azureBoards.url || '')
+    } : null,
+    externalId: typeof input.externalId === 'string' ? input.externalId.trim() : ''
   };
+  let worktreePath = existing?.worktreePath;
+  let branchName = existing?.branchName;
+  if (worktreePath && !(await isDirectory(worktreePath))) throw new Error('Görevin izole çalışma klasörü bulunamadı. Branch’i koruyarak görevi yeniden oluşturman gerekiyor.');
+  if (!worktreePath && !legacySession) ({ worktreePath, branchName } = await prepareWorkflowWorktree(sourceRepositoryPath, id, task));
+  const repositoryPath = legacySession ? existing.repositoryPath : worktreePath;
   const runState = {
     ...(existing || {}),
     id,
     task,
     repositoryPath,
+    sourceRepositoryPath,
+    worktreePath,
+    branchName,
     baseCommit: existing?.baseCommit || (await gitAt(repositoryPath, ['rev-parse', 'HEAD'])).trim(),
     status: 'running',
     error: null,
@@ -361,10 +400,67 @@ async function startWorkflowTask(id, input) {
     updatedAt: now,
     messages: existing?.messages || [{ role: 'user', kind: 'task', content: [input.title, input.description].filter(Boolean).join('\n\n'), at: now }]
   };
+  runState.suggestedCommitMessage = suggestedCommitMessage(task);
   workflowRuns.set(id, runState);
   await persistWorkflowRuns();
   void executeWorkflowTask(runState, profile, isResume).catch(error => console.error('Workflow arka plan hatası:', error));
   return { accepted: true, id, status: 'running' };
+}
+
+async function completeWorkflowTask(id, input) {
+  const workflowRun = workflowRuns.get(id);
+  if (!workflowRun) throw new Error('Bu göreve ait agent çalışması bulunamadı.');
+  if (workflowRun.status !== 'review') throw new Error(workflowRun.status === 'finalizing' ? 'Bu görev için tamamlama işlemi zaten sürüyor.' : 'Yalnızca review aşamasındaki görev tamamlanabilir.');
+  if (!workflowRun.worktreePath || !workflowRun.branchName) throw new Error('Bu görev izole branch desteğinden önce başlatılmış. Güvenli commit için görevi yeni bir workflow çalışması olarak yeniden başlat.');
+  if (!(await isDirectory(workflowRun.worktreePath))) throw new Error('Görevin izole çalışma klasörü bulunamadı.');
+
+  const push = input.push === true;
+  const message = validateCommitMessage(input.commitMessage || workflowRun.suggestedCommitMessage, workflowRun.task);
+  workflowRun.status = 'finalizing';
+  workflowRun.completionError = null;
+  workflowRun.updatedAt = new Date().toISOString();
+  workflowRuns.set(id, workflowRun);
+  await persistWorkflowRuns();
+
+  try {
+    const currentBranch = (await gitAt(workflowRun.worktreePath, ['branch', '--show-current'])).trim();
+    if (currentBranch !== workflowRun.branchName) throw new Error(`Beklenen görev branch’i aktif değil (${workflowRun.branchName}).`);
+
+    if (!workflowRun.completion?.commitHash) {
+      const head = (await gitAt(workflowRun.worktreePath, ['rev-parse', 'HEAD'])).trim();
+      if (head !== workflowRun.baseCommit) throw new Error('Agent çalışma sırasında beklenmeyen bir commit oluşturmuş. Otomatik commit güvenlik nedeniyle durduruldu.');
+      const changes = await workflowChanges(workflowRun.worktreePath);
+      if (!changes.changedFiles.length) throw new Error('Commit oluşturulacak bir dosya değişikliği bulunamadı.');
+      await gitAt(workflowRun.worktreePath, ['diff', '--check']);
+      await gitAt(workflowRun.worktreePath, ['diff', '--cached', '--check']);
+      await gitAt(workflowRun.worktreePath, ['add', '--all']);
+      await gitAt(workflowRun.worktreePath, ['diff', '--cached', '--check']);
+      await gitAt(workflowRun.worktreePath, ['commit', '-m', message]);
+      const commitHash = (await gitAt(workflowRun.worktreePath, ['rev-parse', 'HEAD'])).trim();
+      workflowRun.completion = { commitHash, commitMessage: message, branchName: workflowRun.branchName, pushed: false, committedAt: new Date().toISOString() };
+      workflowRun.updatedAt = workflowRun.completion.committedAt;
+      await persistWorkflowRuns();
+    }
+
+    if (push && !workflowRun.completion.pushed) {
+      await gitAt(workflowRun.worktreePath, ['push', '--set-upstream', 'origin', workflowRun.branchName]);
+      workflowRun.completion.pushed = true;
+      workflowRun.completion.pushedAt = new Date().toISOString();
+    }
+
+    workflowRun.status = 'done';
+    workflowRun.updatedAt = new Date().toISOString();
+    workflowRuns.set(id, workflowRun);
+    await persistWorkflowRuns();
+    return { run: publicWorkflowRun(workflowRun) };
+  } catch (error) {
+    workflowRun.status = 'review';
+    workflowRun.completionError = error.stderr?.trim() || error.detail || error.message || 'Görev tamamlanamadı.';
+    workflowRun.updatedAt = new Date().toISOString();
+    workflowRuns.set(id, workflowRun);
+    await persistWorkflowRuns();
+    throw new Error(workflowRun.completionError);
+  }
 }
 
 createServer(async (req, res) => {
@@ -487,6 +583,16 @@ createServer(async (req, res) => {
       return send(res, 202, await startWorkflowTask(id, input));
     } catch (error) {
       return send(res, 400, { error: error.message || 'Workflow görevi başlatılamadı.' });
+    }
+  }
+  const workflowCompleteMatch = req.url?.match(/^\/api\/workflow\/tasks\/([^/]+)\/complete$/);
+  if (req.method === 'POST' && workflowCompleteMatch) {
+    try {
+      const id = decodeURIComponent(workflowCompleteMatch[1]);
+      const input = await readJson(req, 10_000);
+      return send(res, 200, await completeWorkflowTask(id, input));
+    } catch (error) {
+      return send(res, 400, { error: error.message || 'Görev tamamlanamadı.' });
     }
   }
   const workflowFeedbackMatch = req.url?.match(/^\/api\/workflow\/tasks\/([^/]+)\/feedback$/);

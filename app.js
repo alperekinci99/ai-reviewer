@@ -195,7 +195,9 @@ function workflowRunCard(task, run) {
   if (!run) return '';
   const provider = workflowProviderLabel(run.provider);
   if (run.status === 'running') return `<div class="run-state running"><i></i><span><b>${escape(provider)} çalışıyor</b><small>${escape(run.model || 'varsayılan model')} · ${run.attempt || 1}. tur</small></span></div>`;
+  if (run.status === 'finalizing') return '<div class="run-state running"><i></i><span><b>Görev tamamlanıyor</b><small>Commit ve branch işlemleri yürütülüyor.</small></span></div>';
   if (run.status === 'failed') return `<div class="run-state failed"><b>Çalışma tamamlanamadı</b><span>${escape(run.error || 'Bilinmeyen agent hatası')}</span></div>`;
+  if (task.status === 'done' && run.completion?.commitHash) return `<div class="completion-state"><b>${run.completion.pushed ? 'Commit oluşturuldu ve push edildi' : 'Yerel commit oluşturuldu'}</b><code>${escape(run.completion.commitHash.slice(0, 8))} · ${escape(run.completion.branchName)}</code></div>`;
   if (task.status !== 'review') return '';
   return `<div class="review-ready"><div><b>Review’a hazır</b><small>${escape(provider)} · ${escape(run.model || '')} · ${run.changedFiles?.length || 0} değişen dosya</small></div><button type="button" draggable="false" data-open-workflow-details="${escape(task.id)}">Detayları gör <span>→</span></button></div>`;
 }
@@ -208,7 +210,7 @@ function openWorkflowTaskDetails(taskId) {
   const dialog = $('#workflow-task-dialog');
   dialog.dataset.taskId = taskId;
   $('#workflow-task-title').textContent = task.title;
-  $('#workflow-task-meta').innerHTML = `<span>${escape(task.project || 'Projesiz')}</span><span>${taskPoints(task.points)} puan</span><span>${escape(provider)}</span><span>${escape(run.model || 'varsayılan model')}</span><span>${run.attempt || 1}. tur</span>`;
+  $('#workflow-task-meta').innerHTML = `<span>${escape(task.project || 'Projesiz')}</span><span>${taskPoints(task.points)} puan</span><span>${escape(provider)}</span><span>${escape(run.model || 'varsayılan model')}</span><span>${run.attempt || 1}. tur</span>${run.branchName ? `<span>${escape(run.branchName)}</span>` : ''}`;
   $('#workflow-task-description').textContent = task.description || 'Ek görev açıklaması bulunmuyor.';
   const attachments = Array.isArray(task.attachments) ? task.attachments : [];
   $('#workflow-task-images-section').hidden = !attachments.length;
@@ -226,7 +228,30 @@ function openWorkflowTaskDetails(taskId) {
   feedbackForm.dataset.taskId = taskId;
   feedbackForm.reset();
   feedbackForm.querySelector('small').textContent = '';
+  $('#workflow-complete-open').dataset.taskId = taskId;
   if (!dialog.open) dialog.showModal();
+}
+
+const workflowCompleteDialog = $('#workflow-complete-dialog');
+const workflowCompleteForm = $('#workflow-complete-form');
+
+function openWorkflowCompletion(taskId) {
+  const task = state.tasks.find(item => item.id === taskId);
+  const run = workflowRuns.get(taskId);
+  if (!task || !run || run.status !== 'review') return;
+  workflowCompleteForm.dataset.taskId = taskId;
+  workflowCompleteForm.reset();
+  $('#completion-task-title').textContent = task.title;
+  $('#completion-branch').textContent = run.branchName || 'İzole branch bilgisi bulunamadı';
+  $('#completion-file-count').textContent = `${run.changedFiles?.length || 0} değişen dosya · önce Git diff kontrolü çalıştırılır`;
+  const messageInput = $('#completion-commit-message');
+  messageInput.value = run.completion?.commitMessage || run.suggestedCommitMessage || '';
+  messageInput.disabled = Boolean(run.completion?.commitHash);
+  workflowCompleteForm.elements.namedItem('push').checked = false;
+  $('#completion-error').textContent = run.completionError || (run.worktreePath ? '' : 'Bu görev eski çalışma düzeninde başlatılmış. Güvenli commit için yeniden başlatılması gerekir.');
+  $('#workflow-complete-submit').textContent = run.completion?.commitHash ? 'Tamamla' : 'Commit oluştur ve tamamla';
+  if ($('#workflow-task-dialog').open) $('#workflow-task-dialog').close();
+  if (!workflowCompleteDialog.open) workflowCompleteDialog.showModal();
 }
 
 async function startWorkflowTask(task, { failureStatus } = {}) {
@@ -257,12 +282,27 @@ async function startWorkflowTask(task, { failureStatus } = {}) {
 }
 
 async function moveWorkflowTask(task, status) {
-  if (workflowRuns.get(task.id)?.status === 'running') return;
+  const run = workflowRuns.get(task.id);
+  if (['running', 'finalizing'].includes(run?.status)) return;
+  if (status === 'done' && task.status === 'review' && run?.status === 'review') {
+    openWorkflowCompletion(task.id);
+    return;
+  }
   task.status = status;
   addActivity('◇', `${task.title} taşındı`, columns.find(item => item.id === status).label.toLocaleLowerCase('tr-TR'));
   if (status === 'done') addJournalEntry(`Görev tamamlandı: ${task.title}`, task.description || 'Workflow görevi tamamlandı.', ['workflow', 'tamamlandı']);
   persistAndRender();
   if (status === 'doing') await startWorkflowTask(task);
+}
+
+function applyWorkflowCompletion(task, run) {
+  task.status = 'done';
+  const commitHash = run.completion?.commitHash;
+  if (!commitHash || task.lastCompletionCommit === commitHash) return;
+  task.lastCompletionCommit = commitHash;
+  delete task.workflowError;
+  addActivity('✓', `${task.title} tamamlandı`, `${commitHash.slice(0, 8)} · ${run.completion.pushed ? 'branch push edildi' : 'yerel commit'}`);
+  addJournalEntry(`Görev tamamlandı: ${task.title}`, run.completion.commitMessage || task.description || 'Workflow görevi tamamlandı.', ['workflow', 'tamamlandı', 'commit']);
 }
 
 function renderTasks() {
@@ -272,15 +312,16 @@ function renderTasks() {
       const points = taskPoints(task.points);
       const profile = taskProfiles[points];
       const run = workflowRuns.get(task.id);
-      const running = run?.status === 'running';
+      const running = ['running', 'finalizing'].includes(run?.status);
       const localError = task.workflowError && !['running', 'review'].includes(run?.status) ? `<div class="run-state failed"><b>Başlatılamadı</b><span>${escape(task.workflowError)}</span></div>` : '';
       const azureLink = task.azureBoards?.url ? `<a class="azure-work-item" href="${escape(task.azureBoards.url)}" target="_blank" rel="noreferrer" title="Azure Boards #${escape(task.azureBoards.id)} işini aç">AB#${escape(task.azureBoards.id)}${task.azureBoards.storyPoints !== null && task.azureBoards.storyPoints !== undefined ? ` · SP ${escape(task.azureBoards.storyPoints)}` : ''} ↗</a>` : '';
+      const externalIdBadge = !task.azureBoards && task.externalId ? `<span class="task-reference">${escape(task.externalId)}</span>` : '';
       const attachmentBadge = task.attachments?.length ? `<span class="task-attachment-badge">▧ ${task.attachments.length} görsel</span>` : '';
       const projectControl = task.azureBoards && !task.project
         ? `<select class="task-project-select" data-task-project-select="${escape(task.id)}" aria-label="Repository seç"><option value="">Repository seç…</option>${savedProjects.map(project => `<option value="${escape(project.name)}">${escape(project.name)}</option>`).join('')}</select>`
         : `<span class="task-tag">${escape(task.project || 'Projesiz')}</span>`;
       const editAction = task.status === 'todo' ? `<button class="task-edit" type="button" data-edit-task="${escape(task.id)}" aria-label="Görevi düzenle" title="Görevi düzenle">Düzenle</button>` : '';
-      return `<article class="task-card${running ? ' is-running' : ''}${task.status === 'review' ? ' is-review' : ''}" draggable="${running ? 'false' : 'true'}" data-task-id="${escape(task.id)}"><div class="task-card-actions">${editAction}<button class="task-menu" type="button" data-delete-task="${escape(task.id)}" aria-label="Görevi sil" ${running ? 'disabled' : ''}>×</button></div><h3>${escape(task.title)}</h3>${task.description ? `<p>${escape(task.description)}</p>` : ''}<div class="task-footer">${projectControl}<span class="task-points points-${points}" title="${escape(profile.codex)} · ${escape(profile.claude)}">${points} puan · ${escape(profile.label)}</span></div>${azureLink}${attachmentBadge}${localError || workflowRunCard(task, run)}</article>`;
+      return `<article class="task-card${running ? ' is-running' : ''}${task.status === 'review' ? ' is-review' : ''}" draggable="${running ? 'false' : 'true'}" data-task-id="${escape(task.id)}"><div class="task-card-actions">${editAction}<button class="task-menu" type="button" data-delete-task="${escape(task.id)}" aria-label="Görevi sil" ${running ? 'disabled' : ''}>×</button></div><h3>${escape(task.title)}</h3>${task.description ? `<p>${escape(task.description)}</p>` : ''}<div class="task-footer">${projectControl}<span class="task-points points-${points}" title="${escape(profile.codex)} · ${escape(profile.claude)}">${points} puan · ${escape(profile.label)}</span></div>${azureLink}${externalIdBadge}${attachmentBadge}${localError || workflowRunCard(task, run)}</article>`;
     }).join('');
     return `<section class="kanban-column" data-status="${column.id}"><header class="column-head"><span>${column.label}</span><span class="column-count">${tasks.length}</span></header><div class="task-list">${cards}</div></section>`;
   }).join('');
@@ -334,6 +375,52 @@ function renderTasks() {
 }
 
 $('#workflow-task-close').addEventListener('click', () => $('#workflow-task-dialog').close());
+$('#workflow-complete-open').addEventListener('click', event => openWorkflowCompletion(event.currentTarget.dataset.taskId));
+workflowCompleteForm.elements.namedItem('push').addEventListener('change', event => {
+  const run = workflowRuns.get(workflowCompleteForm.dataset.taskId);
+  $('#workflow-complete-submit').textContent = event.currentTarget.checked
+    ? (run?.completion?.commitHash ? 'Push et ve tamamla' : 'Commit oluştur ve push et')
+    : (run?.completion?.commitHash ? 'Tamamla' : 'Commit oluştur ve tamamla');
+});
+workflowCompleteForm.addEventListener('submit', async event => {
+  if (event.submitter?.value === 'cancel') return;
+  event.preventDefault();
+  const taskId = workflowCompleteForm.dataset.taskId;
+  const task = state.tasks.find(item => item.id === taskId);
+  const button = $('#workflow-complete-submit');
+  const errorBox = $('#completion-error');
+  if (!task) return;
+  button.disabled = true;
+  errorBox.textContent = '';
+  button.textContent = workflowCompleteForm.elements.namedItem('push').checked ? 'Commit ve push hazırlanıyor…' : 'Commit hazırlanıyor…';
+  try {
+    const response = await fetch(`/api/workflow/tasks/${encodeURIComponent(taskId)}/complete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        commitMessage: $('#completion-commit-message').value,
+        push: workflowCompleteForm.elements.namedItem('push').checked
+      })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Görev tamamlanamadı.');
+    workflowRuns.set(taskId, data.run);
+    applyWorkflowCompletion(task, data.run);
+    persistAndRender();
+    workflowCompleteDialog.close();
+  } catch (error) {
+    errorBox.textContent = error.message;
+    await syncWorkflowRuns();
+  } finally {
+    button.disabled = false;
+    const run = workflowRuns.get(taskId);
+    if (run?.completion?.commitHash) {
+      $('#completion-commit-message').value = run.completion.commitMessage;
+      $('#completion-commit-message').disabled = true;
+    }
+    button.textContent = run?.completion?.commitHash ? 'Tamamla' : 'Commit oluştur ve tamamla';
+  }
+});
 $('#workflow-task-feedback').addEventListener('submit', async event => {
   event.preventDefault();
   const feedbackForm = event.currentTarget;
@@ -459,6 +546,10 @@ async function syncWorkflowRuns() {
         }
         stateChanged = true;
       }
+      if (run.status === 'done' && task.status !== 'done') {
+        applyWorkflowCompletion(task, run);
+        stateChanged = true;
+      }
       if (run.status === 'failed' && task.lastFailureAttempt !== run.attempt) {
         task.lastFailureAttempt = run.attempt;
         addActivity('!', `${task.title} tamamlanamadı`, run.error || 'Yerel agent hatası');
@@ -474,13 +565,10 @@ async function syncWorkflowRuns() {
   }
 }
 
-$('#complete-focus').addEventListener('click', event => {
+$('#complete-focus').addEventListener('click', async event => {
   const task = state.tasks.find(item => item.id === event.currentTarget.dataset.taskId);
-  if (!task || workflowRuns.get(task.id)?.status === 'running') return;
-  task.status = 'done';
-  addActivity('✓', `${task.title} tamamlandı`, 'Workflow güncellendi');
-  addJournalEntry(`Görev tamamlandı: ${task.title}`, task.description || 'Odaktaki görev tamamlandı.', ['workflow', 'tamamlandı']);
-  persistAndRender();
+  if (!task || ['running', 'finalizing'].includes(workflowRuns.get(task.id)?.status)) return;
+  await moveWorkflowTask(task, 'done');
 });
 
 const taskDialog = $('#task-dialog');
@@ -554,11 +642,14 @@ function openTaskDialog(task = null) {
   retainedTaskAttachments = task?.attachments ? [...task.attachments] : [];
   if (task) {
     taskForm.elements.title.value = task.title;
+    taskForm.elements.externalId.value = task.azureBoards?.id ? `AB#${task.azureBoards.id}` : task.externalId || '';
+    taskForm.elements.externalId.disabled = Boolean(task.azureBoards);
     taskForm.elements.project.value = task.project || '';
     taskForm.elements.points.value = String(taskPoints(task.points));
     taskForm.elements.description.value = task.description || '';
   }
   taskForm.elements.project.required = !task?.azureBoards;
+  if (!task) taskForm.elements.externalId.disabled = false;
   $('#task-dialog-kicker').textContent = task ? 'GÖREVİ DÜZENLE' : 'YENİ GÖREV';
   $('#task-dialog-title').textContent = task ? 'Detayları güncelle' : 'Odağı tanımla';
   $('#task-submit').textContent = task ? 'Değişiklikleri kaydet' : 'Görevi ekle';
@@ -589,6 +680,7 @@ taskDialog.addEventListener('close', () => {
   editingTaskId = null;
   resetTaskImages();
   taskForm.elements.project.required = true;
+  taskForm.elements.externalId.disabled = false;
   updateTaskModelHint();
 });
 taskForm.addEventListener('submit', async event => {
@@ -606,11 +698,11 @@ taskForm.addEventListener('submit', async event => {
   try {
     const attachments = await persistTaskImages(id, Boolean(editingTask));
     if (editingTask) {
-      Object.assign(editingTask, { title: values.title.trim(), description: values.description.trim(), project: values.project.trim(), points, attachments });
+      Object.assign(editingTask, { title: values.title.trim(), externalId: editingTask.azureBoards ? editingTask.externalId || '' : String(values.externalId || '').trim(), description: values.description.trim(), project: values.project.trim(), points, attachments });
       delete editingTask.workflowError;
       addActivity('✎', `${editingTask.title} güncellendi`, `${editingTask.project || 'Repository bekliyor'} · ${points} puan`);
     } else {
-      const task = { id, title: values.title.trim(), description: values.description.trim(), project: values.project.trim(), points, attachments, status: 'todo', createdAt: Date.now() };
+      const task = { id, title: values.title.trim(), externalId: String(values.externalId || '').trim(), description: values.description.trim(), project: values.project.trim(), points, attachments, status: 'todo', createdAt: Date.now() };
       state.tasks.unshift(task);
       addActivity('＋', values.title.trim(), `${values.project.trim()} · ${points} puanlık workflow görevi`);
     }

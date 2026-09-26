@@ -215,6 +215,7 @@ button,input,textarea,select{font:inherit}
 .task-points.points-5{border-color:#ead1cc;color:#a55043;background:#fff6f4}
 .azure-work-item{display:inline-block;margin-top:9px;color:#4b6f91;font:8px var(--mono);text-decoration:none}
 .azure-work-item:hover{text-decoration:underline}
+.task-reference{display:inline-block;margin-top:9px;border-radius:4px;background:#edf0f5;color:#52627a;padding:5px 7px;font:8px var(--mono)}
 .run-state{display:flex;margin-top:13px;border-radius:6px;padding:10px;font-size:9px;line-height:1.5}
 .run-state.idle{border:1px dashed #dfe3dc;color:#8b918d;background:#fafbf8}
 .run-state.running{align-items:center;gap:9px;background:#f0f6eb;color:#46624e}
@@ -277,6 +278,7 @@ dialog form{padding:27px}
 .task-image-item span{display:block;margin-top:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#69716c;font:8px var(--mono)}
 .task-image-item button{position:absolute;right:9px;top:9px;display:grid;place-items:center;width:22px;height:22px;border:0;border-radius:50%;background:#111b;color:#fff;cursor:pointer}
 #task-form label>small{display:block;margin-top:6px;color:#969b98;font-size:9px;font-weight:400;line-height:1.45}
+.optional-label{margin-left:5px;color:#9ba09d;font:500 7px var(--mono);letter-spacing:.7px}
 .task-attachment-badge{display:inline-flex;align-items:center;gap:4px;margin-top:9px;border-radius:4px;background:#f0f2ed;color:#657068;padding:5px 7px;font:8px var(--mono)}
 .dialog-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .dialog-actions{justify-content:flex-end;gap:8px;margin-top:24px}
@@ -300,6 +302,24 @@ dialog form{padding:27px}
 .workflow-feedback-actions small{color:#617464;font-size:9px;line-height:1.4}
 .workflow-feedback-actions button{flex:none;border:0;border-radius:5px;background:#1c211e;color:#fff;padding:9px 12px;font-size:9px;font-weight:700;cursor:pointer}
 .workflow-feedback-actions button:disabled{opacity:.55}
+.workflow-approval{display:flex;align-items:center;justify-content:space-between;gap:22px;margin-top:20px;padding:17px;border:1px solid #d7e2d1;border-radius:8px;background:#f3f7ef}
+.workflow-approval b{display:block;margin-top:6px;font-size:12px}
+.workflow-approval p{margin:4px 0 0;color:#778177;font-size:9px}
+.workflow-approval button{flex:none;border:0;border-radius:6px;background:#18201a;color:#fff;padding:11px 13px;font-size:9px;font-weight:700;cursor:pointer}
+.workflow-approval button span{margin-left:6px;color:var(--lime)}
+.workflow-complete-dialog{width:min(560px,calc(100% - 28px))}
+.completion-context{display:grid;gap:5px;margin:20px 0 4px;padding:14px;border:1px solid #e1e5de;border-radius:7px;background:#f7f8f5}
+.completion-context strong{font-size:12px}
+.completion-context span{color:#4f6b57;font:9px var(--mono);overflow-wrap:anywhere}
+.completion-context small{color:#8d938f;font-size:9px}
+.completion-push-option{display:flex;align-items:flex-start;gap:10px;padding:13px;border:1px solid #e1e5de;border-radius:7px;background:#fafbf8;cursor:pointer}
+.completion-push-option input{width:auto;margin:2px 0 0;accent-color:#52745f}
+.completion-push-option span{display:grid;gap:3px}
+.completion-push-option b{color:#3f4642;font-size:10px}
+.completion-push-option small{color:#89908b;font-size:9px;line-height:1.45}
+.completion-state{display:grid;gap:4px;margin-top:12px;padding:9px;border-radius:5px;background:#edf4e9;color:#45604c}
+.completion-state b{font-size:9px}
+.completion-state code{font:8px var(--mono);color:#66736a;overflow:hidden;text-overflow:ellipsis}
 
 @media(max-width:1100px){.dashboard-grid{grid-template-columns:1.3fr 1fr}
 .focus-card{grid-column:1/-1}
@@ -345,6 +365,8 @@ dialog form{padding:27px}
 #agent-usage-reset{display:none}
 .agent-usage-chevron{display:none}
 .agent-usage-panel{position:fixed;top:70px;left:12px;right:12px;width:auto}
+.workflow-approval{display:grid;align-items:start}
+.workflow-approval button{width:100%}
 .focus-content h2{font-size:23px}
 }
 

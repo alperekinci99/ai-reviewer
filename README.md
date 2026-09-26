@@ -32,6 +32,10 @@ Workflow görevleri kapsam için `2`, `3` veya `5` puan alır. Puan, workflow ag
 
 Yeni görevler otomatik olarak `To Do` durumunda oluşturulur ve kullanılabilir yerel LLM aracı otomatik seçilir. To Do kartları; başlık, repository, puan, açıklama ve görev görselleriyle birlikte düzenlenebilir. Puan yönlendirmesi kesin bir token üst sınırı değildir; model kapasitesi ve reasoning seviyesi üzerinden kullanım/kalite dengesini yönetir. Reviewer modeli ve çaba ayarı bu puanlardan bağımsız kalır.
 
+Bir görev ilk kez `In Progress` durumuna alındığında portal kaynak repository temizse görev için ayrı bir `workflow/...` branch’i ve kullanıcıya özel bir worktree oluşturur. Agent ve bütün feedback turları bu izole alanda çalışır; ana çalışma klasöründeki kullanıcı değişiklikleriyle karışmaz.
+
+Review onaylandığında `Onayla ve tamamla` akışı diff kontrolü yapar ve görev başlığından conventional commit mesajı üretir. Azure Boards’tan gelen görevlerde kimlik `fix(AB#123): ...` veya `feat(AB#123): ...` biçiminde commit başlığına otomatik eklenir; manuel görevlerde opsiyonel `DEV-42` benzeri iş kimliği girilebilir. Yerel görevlerde gereksiz UUID kullanılmaz. Commit mesajı developer tarafından düzenlenebilir ancak biçim ve varsa görev kimliği sunucuda tekrar doğrulanır. Varsayılan işlem yalnızca yerel commit’tir; branch push işlemi ayrıca seçilirse mevcut yerel Git oturumu üzerinden `origin` remote’una yapılır ve varsayılan branch’e doğrudan push edilmez.
+
 ### Otomatik workflow çalışması ve review döngüsü
 
 Bir görev `In Progress` kolonuna taşındığında seçilen yerel Codex veya Claude Code aracı arka planda otomatik başlar. Görev tamamlandığında kart kendiliğinden `Review` kolonuna geçer; agent özeti, değişen dosyalar ve çalışma sohbeti görev detaylarında gösterilir.
@@ -71,6 +75,8 @@ Finder’dan seçilen Git repository'leri otomatik olarak kullanıcıya özel ye
 Repository klasör adından kısa bir kısayol otomatik üretilir. Aynı adlı farklı repository'ler için `-2`, `-3` gibi güvenli ekler kullanılır. Terminalden ekleme ve silme yapmak isteyenler için `npm run projects` komutu kullanılmaya devam edebilir.
 
 Kayıtlar ortak repository’ye eklenmez: varsayılan olarak kullanıcının `~/.config/ai-reviewer/projects.json` dosyasında tutulur. Başka bir konum kullanmak için `AI_REVIEWER_PROJECTS_FILE`, klasör seçmek için `AI_REVIEWER_CONFIG_DIR` ortam değişkenini tanımlayabilirsiniz. Böylece her kullanıcı kendi yollarını yönetir; paylaşılan kodda kişisel klasör yolları bulunmaz.
+
+Workflow worktree’leri varsayılan olarak `~/.config/ai-reviewer/worktrees/` altında tutulur. Gerekirse bu kök dizin `AI_REVIEWER_WORKTREES_DIR` ile değiştirilebilir. Worktree, branch ve commit bilgileri görev çalışma kaydında saklanır; portalın ana repository’sine veya görev yapılan projenin mevcut checkout’una kişisel yol dosyaları eklenmez.
 
 PR incelemesinde uygulama, `origin` uzak bağlantısından PR’ın merge ref’ini alır ve hedef dal ile kaynak dal arasındaki toplam diff’i inceler. Böylece PR içindeki tüm commit’ler tek inceleme kapsamına girer. GitHub için merge ref kullanılır. Azure DevOps URL’lerinde merge ref erişilebilir değilse uygulama Azure CLI ile PR’ın kaynak ve hedef dallarını alır; bunun için `az login` ve Azure DevOps eklentisi gerekir. Bulgular yalnızca diff’te eklenen satırlara bağlanabilir; değişmeyen dosya ve satırlara ilişkin yorumlar sonuçtan elenir. README ile `AGENTS.md` dosyaları yalnızca bu değişikliklerin etkisini değerlendirmek için bağlam sağlar.
 

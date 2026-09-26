@@ -127,6 +127,7 @@
       <form id="task-form" method="dialog">
         <div class="dialog-head"><div><span id="task-dialog-kicker" class="section-kicker">YENİ GÖREV</span><h2 id="task-dialog-title">Odağı tanımla</h2></div><button class="dialog-close" value="cancel" type="submit" formnovalidate aria-label="Kapat">×</button></div>
         <label>Görev adı<input name="title" required maxlength="100" placeholder="Örn. Review sonuçlarını journal'a bağla" /></label>
+        <label>Görev kimliği <span class="optional-label">OPSİYONEL</span><input name="externalId" maxlength="40" pattern="[A-Za-z][A-Za-z0-9_-]*-[0-9]+" placeholder="Örn. DEV-42" /><small>Jira, Linear veya benzeri bir iş kimliği varsa commit mesajına eklenir. Azure Boards kimliği otomatik gelir.</small></label>
         <label for="task-project">Proje</label><div class="path-picker"><input id="task-project" name="project" list="project-options" required autocomplete="off" placeholder="Proje adı, kısayolu veya repository yolu" /><button class="path-picker-button" type="button" data-pick-folder data-target="task-project" data-feedback="task-error">Finder’dan seç</button></div><div class="saved-project-picker"><div class="saved-project-head"><span>KAYITLI PROJELER</span><button type="button" data-save-project data-target="task-project" data-feedback="task-error">Mevcut yolu kaydet</button></div><div class="saved-project-list" data-project-list data-target="task-project" data-feedback="task-error"></div></div>
         <label>İş puanı<select name="points"><option value="2">2 · Küçük</option><option value="3" selected>3 · Orta</option><option value="5">5 · Kapsamlı</option></select></label><small id="task-model-hint" class="field-hint">Agent ve model otomatik seçilir.</small>
         <label>Not<textarea name="description" rows="3" placeholder="Kısa bağlam veya kabul kriteri"></textarea></label>
@@ -155,8 +156,20 @@
         <section id="workflow-task-images-section" class="workflow-detail-section" hidden><div class="workflow-detail-heading"><span class="section-kicker">GÖRSELLER</span><small id="workflow-task-image-count"></small></div><div id="workflow-task-images" class="workflow-task-images"></div></section>
         <section class="workflow-detail-section"><span class="section-kicker">AGENT ÖZETİ</span><pre id="workflow-task-summary"></pre></section>
         <section class="workflow-detail-section"><div class="workflow-detail-heading"><span class="section-kicker">DEĞİŞEN DOSYALAR</span><small id="workflow-task-change-count"></small></div><div id="workflow-task-files" class="changed-files"></div><p id="workflow-task-files-empty" class="run-no-diff" hidden>Agent çalışma ağacında bir dosya değişikliği üretmedi.</p></section>
+        <section class="workflow-approval"><div><span class="section-kicker">TAMAMLAMA</span><b>Değişiklikleri onayladın mı?</b><p>Kurallı bir commit oluştur; istersen görev branch’ini origin’e gönder.</p></div><button id="workflow-complete-open" type="button">Onayla ve tamamla <span>→</span></button></section>
         <section class="workflow-detail-section"><div class="agent-chat-head"><b>Agent sohbeti</b><span>Feedback gönderildiğinde aynı oturum otomatik olarak yeniden çalışır.</span></div><div id="workflow-task-chat"></div><form id="workflow-task-feedback"><textarea name="feedback" rows="3" maxlength="4000" required placeholder="Değişikliklerle ilgili feedback’ini yaz…"></textarea><div class="workflow-feedback-actions"><small aria-live="polite"></small><button type="submit">Feedback’i gönder</button></div></form></section>
       </div>
+    </dialog>
+
+    <dialog id="workflow-complete-dialog" class="workflow-complete-dialog">
+      <form id="workflow-complete-form" method="dialog">
+        <div class="dialog-head"><div><span class="section-kicker">APPROVE & COMPLETE</span><h2>Görevi tamamla</h2><p>Review edilen değişiklikler görev branch’inde commit edilecek.</p></div><button class="dialog-close" value="cancel" type="submit" formnovalidate aria-label="Kapat">×</button></div>
+        <div class="completion-context"><strong id="completion-task-title"></strong><span id="completion-branch"></span><small id="completion-file-count"></small></div>
+        <label>Commit mesajı<input id="completion-commit-message" name="commitMessage" required minlength="10" maxlength="120" autocomplete="off" /><small>Conventional commit formatı kullanılır. Varsa görev kimliği mesajda korunmalıdır.</small></label>
+        <label class="completion-push-option"><input name="push" type="checkbox" /><span><b>Branch’i origin’e push et</b><small>Yerel Git oturumun kullanılır; varsayılan branch’e doğrudan push yapılmaz.</small></span></label>
+        <div id="completion-error" class="dialog-error" aria-live="polite"></div>
+        <div class="dialog-actions"><button class="secondary-button" value="cancel" type="submit" formnovalidate>Vazgeç</button><button id="workflow-complete-submit" class="primary-button" value="default" type="submit">Commit oluştur ve tamamla</button></div>
+      </form>
     </dialog>
     <script src="/app.js"></script>
   </body>

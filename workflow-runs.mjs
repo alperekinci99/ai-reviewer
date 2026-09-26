@@ -4,6 +4,7 @@ import { homedir } from 'node:os';
 
 const configDirectory = process.env.AI_REVIEWER_CONFIG_DIR || join(homedir(), '.config', 'ai-reviewer');
 export const workflowRunsFile = process.env.AI_REVIEWER_WORKFLOW_RUNS_FILE || join(configDirectory, 'workflow-runs.json');
+export const workflowWorktreesDirectory = process.env.AI_REVIEWER_WORKTREES_DIR || join(configDirectory, 'worktrees');
 
 export async function loadWorkflowRuns() {
   try {
@@ -24,7 +25,9 @@ export async function saveWorkflowRuns(runs) {
 }
 
 export function recoverInterruptedRuns(runs, now = new Date().toISOString()) {
-  return runs.map(run => run.status === 'running'
-    ? { ...run, status: 'failed', error: 'Portal yeniden başlatıldığı için çalışma kesildi. Görevi başka bir kolona, ardından tekrar In Progress kolonuna taşıyarak devam ettirebilirsin.', updatedAt: now }
-    : run);
+  return runs.map(run => {
+    if (run.status === 'running') return { ...run, status: 'failed', error: 'Portal yeniden başlatıldığı için çalışma kesildi. Görevi başka bir kolona, ardından tekrar In Progress kolonuna taşıyarak devam ettirebilirsin.', updatedAt: now };
+    if (run.status === 'finalizing') return { ...run, status: 'review', completionError: 'Tamamlama işlemi portal yeniden başlatıldığı için kesildi. Commit durumunu kontrol edip yeniden deneyebilirsin.', updatedAt: now };
+    return run;
+  });
 }
