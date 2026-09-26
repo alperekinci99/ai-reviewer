@@ -672,7 +672,11 @@ calendarButtons[0].addEventListener('click', () => { calendarDate = new Date(cal
 calendarButtons[1].addEventListener('click', () => { calendarDate = new Date(calendarDate.getFullYear(), calendarDate.getMonth() + 1, 1); renderCalendar(); });
 
 window.addEventListener('keydown', event => {
-  if (event.key === 'Escape') $('.sidebar').classList.remove('open');
+  if (event.key === 'Escape') {
+    $('.sidebar').classList.remove('open');
+    agentUsagePanel.hidden = true;
+    agentUsage.setAttribute('aria-expanded', 'false');
+  }
 });
 
 const form = $('#review-form');
@@ -682,6 +686,9 @@ const repository = $('#repository');
 const agentUsage = $('#agent-usage');
 const agentUsageLabel = $('#agent-usage-label');
 const agentUsageValue = $('#agent-usage-value');
+const agentUsageReset = $('#agent-usage-reset');
+const agentUsagePanel = $('#agent-usage-panel');
+const agentUsageWindows = $('#agent-usage-windows');
 const contextError = $('#context-error');
 const commitOverview = $('#commit-overview');
 const diffInput = $('#diff-input');
@@ -875,16 +882,41 @@ async function checkProviders() {
 }
 
 function usageWindowLabel(minutes) {
-  if (!Number.isFinite(minutes)) return 'Kullanım penceresi';
-  if (minutes % 10080 === 0) return `${minutes / 10080} haftalık pencere`;
-  if (minutes % 1440 === 0) return `${minutes / 1440} günlük pencere`;
-  if (minutes % 60 === 0) return `${minutes / 60} saatlik pencere`;
-  return `${minutes} dakikalık pencere`;
+  if (!Number.isFinite(minutes)) return 'Kullanım limiti';
+  if (minutes === 10_080) return 'Haftalık limit';
+  if (minutes % 10_080 === 0) return `${minutes / 10_080} haftalık limit`;
+  if (minutes === 1_440) return 'Günlük limit';
+  if (minutes % 1_440 === 0) return `${minutes / 1_440} günlük limit`;
+  if (minutes % 60 === 0) return `${minutes / 60} saatlik limit`;
+  return `${minutes} dakikalık limit`;
 }
 
 function usageResetLabel(timestamp) {
   if (!timestamp) return '';
   return new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(timestamp * 1000));
+}
+
+function usageTimeRemaining(timestamp) {
+  if (!timestamp) return 'Yenilenme zamanı bilinmiyor';
+  const minutes = Math.max(0, Math.ceil((timestamp * 1000 - Date.now()) / 60_000));
+  if (minutes === 0) return 'Şimdi yenileniyor';
+  const days = Math.floor(minutes / 1_440);
+  const hours = Math.floor((minutes % 1_440) / 60);
+  const rest = minutes % 60;
+  if (days) return `${days} gün${hours ? ` ${hours} sa` : ''} sonra`;
+  if (hours) return `${hours} sa${rest ? ` ${rest} dk` : ''} sonra`;
+  return `${rest} dk sonra`;
+}
+
+function usageWindowMarkup(window) {
+  const remaining = Math.max(0, Math.min(100, Math.round(window.remainingPercent)));
+  const tone = remaining <= 20 ? 'is-low' : remaining <= 40 ? 'is-medium' : '';
+  const exactReset = usageResetLabel(window.resetsAt);
+  return `<div class="usage-window ${tone}">
+    <div class="usage-window-head"><strong>${usageWindowLabel(window.windowDurationMins)}</strong><span>%${remaining} kaldı</span></div>
+    <div class="usage-window-bar" aria-hidden="true"><i style="width:${remaining}%"></i></div>
+    <div class="usage-window-meta"><span>${usageTimeRemaining(window.resetsAt)}</span><span>${exactReset ? `${exactReset} yenilenir` : ''}</span></div>
+  </div>`;
 }
 
 function renderAgentUsage(data) {
@@ -897,6 +929,8 @@ function renderAgentUsage(data) {
     agentUsage.style.setProperty('--usage', 0);
     agentUsageLabel.textContent = 'YEREL AGENT';
     agentUsageValue.textContent = 'Oturum gerekli';
+    agentUsageReset.textContent = '';
+    agentUsageWindows.innerHTML = '<p>Kullanılabilir bir yerel LLM oturumu bulunamadı.</p>';
     agentUsage.title = 'Kullanılabilir bir yerel LLM oturumu bulunamadı.';
     return;
   }
@@ -906,6 +940,8 @@ function renderAgentUsage(data) {
     agentUsage.classList.add('is-unavailable');
     agentUsage.style.setProperty('--usage', 0);
     agentUsageValue.textContent = 'Kullanım verisi yok';
+    agentUsageReset.textContent = '';
+    agentUsageWindows.innerHTML = `<p>${escape(activeProvider.name)} hazır; ancak kullanım yüzdesini yerel olarak paylaşmıyor.</p>`;
     agentUsage.title = `${activeProvider.name} hazır; kullanım yüzdesi bu araç tarafından paylaşılmıyor.`;
     return;
   }
@@ -915,11 +951,24 @@ function renderAgentUsage(data) {
   if (remaining <= 20) agentUsage.classList.add('is-low');
   else if (remaining <= 40) agentUsage.classList.add('is-medium');
   agentUsageValue.textContent = `%${remaining} kaldı`;
-  agentUsage.title = usage.windows.map(window => {
-    const reset = usageResetLabel(window.resetsAt);
-    return `${usageWindowLabel(window.windowDurationMins)}: %${window.remainingPercent} kaldı${reset ? ` · ${reset} sıfırlanır` : ''}`;
-  }).join('\n');
+  const limitingWindow = usage.windows.reduce((lowest, window) => window.remainingPercent < lowest.remainingPercent ? window : lowest);
+  agentUsageLabel.textContent = `${activeProvider.name.toLocaleUpperCase('tr-TR')} · ${usageWindowLabel(limitingWindow.windowDurationMins).toLocaleUpperCase('tr-TR')}`;
+  agentUsageReset.textContent = usageTimeRemaining(limitingWindow.resetsAt);
+  agentUsageWindows.innerHTML = usage.windows.map(usageWindowMarkup).join('');
+  agentUsage.title = 'Kullanım detaylarını aç';
 }
+
+agentUsage.addEventListener('click', () => {
+  const willOpen = agentUsagePanel.hidden;
+  agentUsagePanel.hidden = !willOpen;
+  agentUsage.setAttribute('aria-expanded', String(willOpen));
+});
+document.addEventListener('click', event => {
+  if (!agentUsagePanel.hidden && !event.target.closest('.top-actions')) {
+    agentUsagePanel.hidden = true;
+    agentUsage.setAttribute('aria-expanded', 'false');
+  }
+});
 
 modelInput.addEventListener('change', () => {
   const maxOption = effortInput.querySelector('option[value="max"]');

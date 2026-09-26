@@ -29,13 +29,18 @@
         <header class="topbar">
           <button id="mobile-menu" class="icon-button mobile-menu" type="button" aria-label="Menüyü aç">☰</button>
           <div class="top-actions">
-            <div id="agent-usage" class="agent-usage is-loading" role="status" aria-live="polite" title="Yerel agent kullanımı kontrol ediliyor">
+            <button id="agent-usage" class="agent-usage is-loading" type="button" aria-expanded="false" aria-controls="agent-usage-panel" title="Kullanım detaylarını aç">
               <span class="agent-usage-meter" aria-hidden="true"><i></i></span>
               <span class="agent-usage-copy">
                 <small><i class="agent-connection-dot"></i><span id="agent-usage-label">YEREL AGENT</span></small>
-                <strong id="agent-usage-value">Kontrol ediliyor</strong>
+                <span class="agent-usage-summary"><strong id="agent-usage-value">Kontrol ediliyor</strong><span id="agent-usage-reset"></span></span>
               </span>
-            </div>
+              <span class="agent-usage-chevron" aria-hidden="true">⌄</span>
+            </button>
+            <section id="agent-usage-panel" class="agent-usage-panel" aria-label="Agent kullanım detayları" hidden>
+              <div class="agent-usage-panel-head"><span>KULLANIM LİMİTLERİ</span><small>60 sn’de yenilenir</small></div>
+              <div id="agent-usage-windows" class="agent-usage-windows"><p>Kullanım bilgisi yükleniyor…</p></div>
+            </section>
           </div>
         </header>
 
