@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { claudeExecArgs, codexExecArgs, resolveLocalAgent } from './llm-providers.mjs';
+import { claudeExecArgs, codexExecArgs, normalizeCodexUsage, resolveLocalAgent } from './llm-providers.mjs';
 
 test('workflow executor çakışan approve-for-me bayrağı olmadan workspace-write kullanır', () => {
   const args = codexExecArgs({ mode: 'execute', model: 'gpt-5.6-terra', effort: 'medium', outputPath: '/tmp/result.md' });
@@ -51,4 +51,23 @@ test('seçili provider için model çalışma başlamadan belirlenir', async () 
   });
 
   assert.deepEqual(selection, { provider: 'codex', model: 'gpt-5.6-terra', effort: 'medium' });
+});
+
+test('Codex kullanımında en kısıtlı pencerenin kalan yüzdesini seçer', () => {
+  const usage = normalizeCodexUsage({
+    rateLimitsByLimitId: {
+      codex: {
+        primary: { usedPercent: 21, windowDurationMins: 300, resetsAt: 1_790_424_295 },
+        secondary: { usedPercent: 18, windowDurationMins: 10_080, resetsAt: 1_790_945_950 }
+      }
+    }
+  });
+
+  assert.equal(usage.available, true);
+  assert.equal(usage.remainingPercent, 79);
+  assert.deepEqual(usage.windows.map(window => window.remainingPercent), [79, 82]);
+});
+
+test('Codex kullanım verisi yoksa yüzde uydurmaz', () => {
+  assert.deepEqual(normalizeCodexUsage({ rateLimits: {} }), { provider: 'codex', available: false, windows: [] });
 });

@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -18,6 +18,9 @@ const binaries = {
 let providerStatusCache = null;
 let providerStatusCachedAt = 0;
 const providerStatusTtl = 5 * 60_000;
+let usageCache = null;
+let usageCachedAt = 0;
+const usageCacheTtl = 60_000;
 
 function execute(binary, args, { cwd, input, maxBuffer = 8_000_000 } = {}) {
   return new Promise((resolve, reject) => {
@@ -55,6 +58,78 @@ export async function providerStatuses({ fresh = false } = {}) {
   providerStatusCache = await Promise.all([inspectCodex(), inspectClaude()]);
   providerStatusCachedAt = Date.now();
   return providerStatusCache;
+}
+
+function clampPercent(value) {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+export function normalizeCodexUsage(payload) {
+  const bucket = payload?.rateLimitsByLimitId?.codex || payload?.rateLimits;
+  const windows = [bucket?.primary, bucket?.secondary]
+    .filter(window => Number.isFinite(window?.usedPercent))
+    .map(window => ({
+      remainingPercent: clampPercent(100 - window.usedPercent),
+      windowDurationMins: Number.isFinite(window.windowDurationMins) ? window.windowDurationMins : null,
+      resetsAt: Number.isFinite(window.resetsAt) ? window.resetsAt : null
+    }));
+  if (!windows.length) return { provider: 'codex', available: false, windows: [] };
+  return {
+    provider: 'codex',
+    available: true,
+    remainingPercent: Math.min(...windows.map(window => window.remainingPercent)),
+    windows
+  };
+}
+
+function readCodexUsage() {
+  return new Promise((resolve, reject) => {
+    const child = spawn(binaries.codex, ['app-server', '--stdio'], { stdio: ['pipe', 'pipe', 'ignore'] });
+    let buffer = '';
+    let settled = false;
+    const finish = (error, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      child.kill();
+      error ? reject(error) : resolve(value);
+    };
+    const timeout = setTimeout(() => finish(new Error('Codex kullanım bilgisi zaman aşımına uğradı.')), 8_000);
+    child.on('error', error => finish(error));
+    child.on('exit', code => {
+      if (!settled) finish(new Error(`Codex kullanım servisi kapandı (${code ?? 'bilinmiyor'}).`));
+    });
+    child.stdout.on('data', chunk => {
+      buffer += chunk;
+      let newline;
+      while ((newline = buffer.indexOf('\n')) >= 0) {
+        const line = buffer.slice(0, newline);
+        buffer = buffer.slice(newline + 1);
+        try {
+          const message = JSON.parse(line);
+          if (message.id === 1) {
+            child.stdin.write(`${JSON.stringify({ id: 2, method: 'account/rateLimits/read', params: { excludeResetCreditDetails: true } })}\n`);
+          } else if (message.id === 2) {
+            if (message.error) finish(new Error(message.error.message || 'Codex kullanım bilgisi alınamadı.'));
+            else finish(null, normalizeCodexUsage(message.result));
+          }
+        } catch { /* App server diagnostics may include non-JSON lines. */ }
+      }
+    });
+    child.stdin.write(`${JSON.stringify({
+      id: 1,
+      method: 'initialize',
+      params: { clientInfo: { name: 'ai-reviewer', title: 'AI Reviewer', version: '1.0.0' }, capabilities: null }
+    })}\n`);
+  });
+}
+
+export async function agentUsage({ fresh = false } = {}) {
+  if (!fresh && usageCache && Date.now() - usageCachedAt < usageCacheTtl) return usageCache;
+  try { usageCache = await readCodexUsage(); }
+  catch { usageCache = { provider: 'codex', available: false, windows: [] }; }
+  usageCachedAt = Date.now();
+  return usageCache;
 }
 
 async function selectProvider(requested = 'auto') {

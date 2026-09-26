@@ -17,7 +17,7 @@ button,input,textarea,select{font:inherit}
 .nav-badge{font:500 9px var(--mono);letter-spacing:.5px;text-transform:uppercase;color:#111;background:var(--lime);padding:3px 5px;border-radius:3px}
 .sidebar-bottom{margin-top:auto}
 .local-state{display:flex;align-items:center;gap:8px;padding:12px 10px;color:#737a7a;font-size:11px;border-bottom:1px solid #25292c}
-.local-state i,.connection i{width:6px;height:6px;border-radius:50%;background:#70b586;box-shadow:0 0 0 3px #70b58616}
+.local-state i{width:6px;height:6px;border-radius:50%;background:#70b586;box-shadow:0 0 0 3px #70b58616}
 .profile{margin-top:14px;width:100%;border:0;background:transparent;color:#fff;display:grid;grid-template-columns:34px 1fr auto;gap:10px;align-items:center;text-align:left;padding:8px;cursor:pointer}
 .avatar{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:#e3e8df;color:#1d2622;font-size:11px;font-weight:800}
 .profile b,.profile small{display:block}
@@ -26,11 +26,21 @@ button,input,textarea,select{font:inherit}
 .profile-more{color:#686f70}
 .main{min-width:0}
 .topbar{height:74px;padding:0 4.5vw;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);background:#f7f8f5}
-.top-actions{display:flex;align-items:center;gap:18px;margin-left:auto}
-.command-trigger{height:34px;display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:7px;background:#fff;color:#898e8d;padding:0 8px;font-size:11px;cursor:pointer}
-.command-trigger>span:first-child{font-size:16px}
-.command-trigger kbd{font:9px var(--mono);background:#f0f1ed;padding:3px 5px;border-radius:3px;color:#777c79}
-.connection{display:flex;align-items:center;gap:7px;font-size:10px;color:#707674}
+.top-actions{display:flex;align-items:center;margin-left:auto}
+.agent-usage{--usage:0;--usage-color:#6f9c78;display:flex;align-items:center;gap:10px;min-width:162px;height:46px;padding:7px 12px 7px 9px;border:1px solid #dfe3dc;border-radius:12px;background:#fff;box-shadow:0 4px 14px #171a1d08;transition:border-color .2s,box-shadow .2s}
+.agent-usage:hover{border-color:#cfd5cc;box-shadow:0 6px 18px #171a1d0d}
+.agent-usage-meter{display:grid;place-items:center;width:29px;height:29px;flex:0 0 auto;border-radius:50%;background:conic-gradient(var(--usage-color) calc(var(--usage) * 1%),#e6e9e3 0)}
+.agent-usage-meter i{width:19px;height:19px;border-radius:50%;background:#fff}
+.agent-usage-copy{display:grid;gap:2px;min-width:0}
+.agent-usage-copy small{display:flex;align-items:center;gap:6px;color:#818784;font:500 8px var(--mono);letter-spacing:1px;white-space:nowrap}
+.agent-usage-copy strong{color:#252a29;font-size:11px;font-weight:700;white-space:nowrap}
+.agent-connection-dot{width:5px;height:5px;border-radius:50%;background:#70b586;box-shadow:0 0 0 3px #70b58616}
+.agent-usage.is-loading .agent-usage-meter{background:#eceee9;animation:usage-pulse 1.4s ease-in-out infinite}
+.agent-usage.is-unavailable{--usage-color:#9da29f}
+.agent-usage.is-unavailable .agent-connection-dot{background:#a8adaa;box-shadow:none}
+.agent-usage.is-low{--usage-color:var(--red)}
+.agent-usage.is-medium{--usage-color:var(--amber)}
+@keyframes usage-pulse{50%{opacity:.55}}
 .mobile-menu{display:none}
 .view{display:none;padding:52px 4.5vw 70px;max-width:1460px;margin:auto;animation:fade .2s ease}
 .view.active{display:block}
@@ -282,7 +292,7 @@ dialog form{padding:27px}
 .main{width:100%}
 .topbar{height:64px;padding:0 16px}
 .mobile-menu{display:block;border:0;background:transparent;font-size:19px}
-.top-actions .connection,.command-trigger>span:nth-child(2){display:none}
+.agent-usage{height:40px;min-width:150px}
 .view{padding:32px 16px 55px}
 .page-heading{align-items:flex-start}
 .page-heading h1{letter-spacing:-1.4px}
@@ -304,8 +314,9 @@ dialog form{padding:27px}
 .metric-card{min-height:200px}
 .dialog-grid{grid-template-columns:1fr}
 .top-actions{gap:6px}
-.command-trigger{width:34px}
-.command-trigger kbd{display:none}
+.agent-usage{min-width:0;padding-right:9px}
+.agent-usage-copy small{display:none}
+.agent-usage-copy strong{font-size:10px}
 .focus-content h2{font-size:23px}
 }
 

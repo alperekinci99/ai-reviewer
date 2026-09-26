@@ -8,7 +8,7 @@ import { homedir } from 'node:os';
 import { limitReviewToChangedCode } from './review-scope.mjs';
 import { azurePullRequestUrl } from './pr-url.mjs';
 import { isDirectory, loadProjects, saveProjects } from './project-config.mjs';
-import { providerStatuses, resolveLocalAgent, runLocalAgent } from './llm-providers.mjs';
+import { agentUsage, providerStatuses, resolveLocalAgent, runLocalAgent } from './llm-providers.mjs';
 import { taskProfile } from './task-routing.mjs';
 import { loadWorkflowRuns, recoverInterruptedRuns, saveWorkflowRuns } from './workflow-runs.mjs';
 import { azureBoardsWiql, azureOrganizationUrl, normalizeAzureBoardItems } from './azure-boards.mjs';
@@ -521,8 +521,8 @@ createServer(async (req, res) => {
     return send(res, 200, { deleted: true });
   }
   if (req.method === 'GET' && req.url === '/api/status') {
-    const providers = await providerStatuses();
-    return send(res, 200, { connected: providers.some(provider => provider.available), providers });
+    const [providers, usage] = await Promise.all([providerStatuses(), agentUsage()]);
+    return send(res, 200, { connected: providers.some(provider => provider.available), providers, usage });
   }
   if (req.method === 'POST' && req.url === '/api/review') {
     let raw = '';

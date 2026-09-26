@@ -29,8 +29,13 @@
         <header class="topbar">
           <button id="mobile-menu" class="icon-button mobile-menu" type="button" aria-label="Menüyü aç">☰</button>
           <div class="top-actions">
-            <button class="command-trigger" type="button" aria-label="Komut paletini aç"><span>⌕</span><span>Hızlı ara</span><kbd>⌘ K</kbd></button>
-            <span id="codex-status" class="connection"><i></i>Codex kontrol ediliyor</span>
+            <div id="agent-usage" class="agent-usage is-loading" role="status" aria-live="polite" title="Yerel agent kullanımı kontrol ediliyor">
+              <span class="agent-usage-meter" aria-hidden="true"><i></i></span>
+              <span class="agent-usage-copy">
+                <small><i class="agent-connection-dot"></i><span id="agent-usage-label">YEREL AGENT</span></small>
+                <strong id="agent-usage-value">Kontrol ediliyor</strong>
+              </span>
+            </div>
           </div>
         </header>
 

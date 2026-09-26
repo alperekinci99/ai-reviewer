@@ -671,9 +671,7 @@ const calendarButtons = $$('.calendar-head button');
 calendarButtons[0].addEventListener('click', () => { calendarDate = new Date(calendarDate.getFullYear(), calendarDate.getMonth() - 1, 1); renderCalendar(); });
 calendarButtons[1].addEventListener('click', () => { calendarDate = new Date(calendarDate.getFullYear(), calendarDate.getMonth() + 1, 1); renderCalendar(); });
 
-$('.command-trigger').addEventListener('click', () => showView('workflow'));
 window.addEventListener('keydown', event => {
-  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); showView('workflow'); }
   if (event.key === 'Escape') $('.sidebar').classList.remove('open');
 });
 
@@ -681,7 +679,9 @@ const form = $('#review-form');
 const result = $('#result');
 const status = $('#status');
 const repository = $('#repository');
-const codexStatus = $('#codex-status');
+const agentUsage = $('#agent-usage');
+const agentUsageLabel = $('#agent-usage-label');
+const agentUsageValue = $('#agent-usage-value');
 const contextError = $('#context-error');
 const commitOverview = $('#commit-overview');
 const diffInput = $('#diff-input');
@@ -864,15 +864,61 @@ async function checkProviders() {
   try {
     const response = await fetch('/api/status');
     const data = await response.json();
-    if (!response.ok || !data.connected) throw new Error();
+    if (!response.ok) throw new Error();
     const options = '<option value="auto">Otomatik seçim</option>' + data.providers.map(provider => `<option value="${escape(provider.id)}" ${provider.available ? '' : 'disabled'}>${escape(provider.name)} · ${provider.available ? 'hazır' : provider.detail}</option>`).join('');
     providerInput.innerHTML = options;
     providerInput.value = data.providers.some(provider => provider.id === state.reviewProvider && provider.available) ? state.reviewProvider : 'auto';
     automaticWorkflowProvider = data.providers.find(provider => provider.available)?.id || 'auto';
     updateTaskModelHint();
-    const available = data.providers.filter(provider => provider.available).map(provider => provider.name);
-    codexStatus.innerHTML = `<i></i>${escape(available.join(' · '))} hazır`;
-  } catch { codexStatus.textContent = 'Yerel LLM oturumu gerekli'; }
+    renderAgentUsage(data);
+  } catch { renderAgentUsage({ connected: false, providers: [], usage: null }); }
+}
+
+function usageWindowLabel(minutes) {
+  if (!Number.isFinite(minutes)) return 'Kullanım penceresi';
+  if (minutes % 10080 === 0) return `${minutes / 10080} haftalık pencere`;
+  if (minutes % 1440 === 0) return `${minutes / 1440} günlük pencere`;
+  if (minutes % 60 === 0) return `${minutes / 60} saatlik pencere`;
+  return `${minutes} dakikalık pencere`;
+}
+
+function usageResetLabel(timestamp) {
+  if (!timestamp) return '';
+  return new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(timestamp * 1000));
+}
+
+function renderAgentUsage(data) {
+  const activeProvider = data.providers?.find(provider => provider.available);
+  const usage = data.usage?.available && data.usage.provider === activeProvider?.id ? data.usage : null;
+  agentUsage.classList.remove('is-loading', 'is-unavailable', 'is-low', 'is-medium');
+
+  if (!activeProvider) {
+    agentUsage.classList.add('is-unavailable');
+    agentUsage.style.setProperty('--usage', 0);
+    agentUsageLabel.textContent = 'YEREL AGENT';
+    agentUsageValue.textContent = 'Oturum gerekli';
+    agentUsage.title = 'Kullanılabilir bir yerel LLM oturumu bulunamadı.';
+    return;
+  }
+
+  agentUsageLabel.textContent = `${activeProvider.name.toLocaleUpperCase('tr-TR')} KULLANIMI`;
+  if (!usage) {
+    agentUsage.classList.add('is-unavailable');
+    agentUsage.style.setProperty('--usage', 0);
+    agentUsageValue.textContent = 'Kullanım verisi yok';
+    agentUsage.title = `${activeProvider.name} hazır; kullanım yüzdesi bu araç tarafından paylaşılmıyor.`;
+    return;
+  }
+
+  const remaining = Math.max(0, Math.min(100, Math.round(usage.remainingPercent)));
+  agentUsage.style.setProperty('--usage', remaining);
+  if (remaining <= 20) agentUsage.classList.add('is-low');
+  else if (remaining <= 40) agentUsage.classList.add('is-medium');
+  agentUsageValue.textContent = `%${remaining} kaldı`;
+  agentUsage.title = usage.windows.map(window => {
+    const reset = usageResetLabel(window.resetsAt);
+    return `${usageWindowLabel(window.windowDurationMins)}: %${window.remainingPercent} kaldı${reset ? ` · ${reset} sıfırlanır` : ''}`;
+  }).join('\n');
 }
 
 modelInput.addEventListener('change', () => {
@@ -887,6 +933,7 @@ updateTaskModelHint();
 showView(location.hash.slice(1) || 'dashboard', false);
 persistAndRender();
 checkProviders();
+setInterval(checkProviders, 60_000);
 loadProjectOptions().then(loadRepositoryContext);
 syncWorkflowRuns();
 setInterval(syncWorkflowRuns, 2000);
